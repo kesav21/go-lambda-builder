@@ -1,30 +1,32 @@
+// kk
+//
+//     ./builder \
+//         -bucket=flipx-binaries-test-us-east-1 \
+//         -signing-prefix=test/unsigned \
+//         -staging-prefix=test/staging \
+//         -signed-prefix=test/signed \
+//         -include=deleteProperty,getProperty \
+//         -exclude=internal \
+//         -no-update-functions \
+//         -force
+//
 package main
 
 import (
-	"archive/zip"
-	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/base64"
-	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	s3Types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/aws-sdk-go-v2/service/signer"
-	signerTypes "github.com/aws/aws-sdk-go-v2/service/signer/types"
 )
 
 var envFlag = flag.String("env", "test", `Which enviroment to target. Must be "test" or "prod".`)
@@ -45,8 +47,7 @@ var noUpdateFunctionsFlag = flag.Bool("no-update-functions", false, "Do not upda
 //
 // if you run two zips on the same input, the hashes of the outputs will be the same
 //
-// if you run two signing jobs on the same input, the hashes of the outputs will be
-// different
+// if you run two signing jobs on the same input, the hashes of the outputs will be different
 //
 // no need to use upx
 // default is -7
@@ -61,7 +62,7 @@ var noUpdateFunctionsFlag = flag.Bool("no-update-functions", false, "Do not upda
 // size of unsigned deployment package with upx -7 | 5.82 M
 //
 func main() {
-	t0 := newTimer()
+	timer := newTimer()
 
 	// err := os.Chdir("lambdas")
 	// if err != nil {
@@ -98,11 +99,6 @@ func main() {
 		fmt.Printf("Deploying all folders.\n")
 	}
 
-	bucket := fmt.Sprintf("flipx-binaries-%s-us-east-1", env)
-	unsignedPrefix := fmt.Sprintf("%s/unsigned", env)
-	stagingPrefix := fmt.Sprintf("%s/staging", env)
-	signedPrefix := fmt.Sprintf("%s/signed", env)
-
 	environ := os.Environ()
 	environ = append(environ, "GOOS=linux")
 	environ = append(environ, "GOARCH=amd64")
@@ -112,34 +108,29 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
 	s3Client := s3.NewFromConfig(cfg)
+	bucket := fmt.Sprintf("flipx-binaries-%s-us-east-1", env)
+	unsignedPrefix := fmt.Sprintf("%s/unsigned", env)
+	stagingPrefix := fmt.Sprintf("%s/staging", env)
+	signedPrefix := fmt.Sprintf("%s/signed", env)
+
 	signerClient := signer.NewFromConfig(cfg)
-	lambdaClient := lambda.NewFromConfig(cfg)
+	signingProfile := env + "_signer"
 	signingJobWaiter := signer.NewSuccessfulSigningJobWaiter(
 		signerClient,
 		func(o *signer.SuccessfulSigningJobWaiterOptions) {
 			o.MinDelay = 2
 			o.MaxDelay = 10
 		})
+
+	lambdaClient := lambda.NewFromConfig(cfg)
 	functionUpdatedWaiter := lambda.NewFunctionUpdatedV2Waiter(
 		lambdaClient,
 		func(o *lambda.FunctionUpdatedV2WaiterOptions) {
 			o.MinDelay = 3
 			o.MaxDelay = 10
 		})
-
-	signingProfile := env + "_signer"
-
-	// err = cleanBinaries(s3Client, bucket, unsignedPrefix, stagingPrefix)
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// hasLinter := true
-	// _, err = exec.LookPath("golangci-lint")
-	// if err != nil {
-	// 	hasLinter = false
-	// }
 
 	// matches, err := filepath.Glob("/usr/local/go/bin")
 	// if err != nil {
@@ -151,141 +142,40 @@ func main() {
 
 	// fmt.Printf("%s\n", os.Getenv("PATH"))
 
-	var wg sync.WaitGroup
+	d := &data{
+		//
+		noUpdateFunctions: noUpdateFunctions,
+		force:             force,
+		//
+		environ: environ,
+		//
+		s3:             s3Client,
+		bucket:         bucket,
+		unsignedPrefix: unsignedPrefix,
+		stagingPrefix:  stagingPrefix,
+		signedPrefix:   signedPrefix,
+		//
+		signer:           signerClient,
+		signingProfile:   signingProfile,
+		signingJobWaiter: signingJobWaiter,
+		//
+		lambda:                lambdaClient,
+		functionUpdatedWaiter: functionUpdatedWaiter,
+	}
+
+	wg := sync.WaitGroup{}
 	for _, folder := range folders {
 		wg.Add(1)
 		go func(folder string) {
 			defer wg.Done()
-			//
-			d := data{
-				bucket:                bucket,
-				stagingPrefix:         stagingPrefix,
-				environ:               environ,
-				s3:                    s3Client,
-				signer:                signerClient,
-				signingProfile:        signingProfile,
-				signingJobWaiter:      signingJobWaiter,
-				lambda:                lambdaClient,
-				functionUpdatedWaiter: functionUpdatedWaiter,
-				//
-				folder:         folder,
-				executablePath: fmt.Sprintf("/tmp/%s", folder),
-				unsignedKey:    fmt.Sprintf("%s/%s.zip", unsignedPrefix, folder),
-				signedKey:      fmt.Sprintf("%s/%s.zip", signedPrefix, folder),
-			}
-			//
-			err = d.buildExecutable()
-			if err != nil {
-				return
-			}
-			defer os.Remove(d.executablePath)
-			//
-			unsignedR, err := d.zipExecutable()
-			if err != nil {
-				return
-			}
-			//
-			unsignedR1, err := d.sizeExecutable(unsignedR)
-			if err != nil {
-				return
-			}
-			//
-			unsignedHash, unsignedR2, err := d.hashExecutable(unsignedR1)
-			if err != nil {
-				return
-			}
-			//
-			if !force {
-				isUpToDate, err := d.isUpToDate(unsignedHash)
-				if err != nil {
-					return
-				}
-				if isUpToDate {
-					return
-				}
-			}
-			//
-			objectVersion, err := d.putObject(unsignedR2)
-			if err != nil {
-				return
-			}
-			defer deleteObject(s3Client, bucket, d.unsignedKey)
-			//
-			jobId, err := d.startSigningJob(objectVersion)
-			if err != nil {
-				return
-			}
-			stagingKey := stagingPrefix + "/" + jobId + ".zip"
-			//
-			err = d.waitForSigningJob(jobId)
-			if err != nil {
-				return
-			}
-			defer deleteObject(s3Client, bucket, stagingKey)
-			//
-			signedR, err := d.getObject(stagingKey)
-			if err != nil {
-				return
-			}
-			defer signedR.Close()
-			//
-			signedHash, err := d.hashObject(signedR)
-			if err != nil {
-				return
-			}
-			//
-			err = d.copyObject(stagingKey, map[string]string{
-				"unsignedHash":     unsignedHash,
-				"signedHash":       signedHash,
-				"source-code-hash": signedHash,
-			})
-			if err != nil {
-				return
-			}
-			//
-			if !noUpdateFunctions {
-				err = d.updateFunctionCode()
-				if err != nil {
-					return
-				}
-				//
-				err = d.waitForFunctionUpdate()
-				if err != nil {
-					return
-				}
-				//
-				functionVersion, err := d.publishLambdaVersion(signedHash)
-				if err != nil {
-					return
-				}
-				//
-				err = d.updateFunctionAlias(functionVersion)
-				if err != nil {
-					return
-				}
-			}
+			d.run(folder)
 		}(folder)
 	}
 	wg.Wait()
 
-	// err = cleanBinaries(s3Client, bucket, unsignedPrefix, stagingPrefix)
-	// if err != nil {
-	// 	panic(err)
-	// }
-
 	fmt.Printf("\n")
-	fmt.Printf("Took %s.\n", t0())
+	fmt.Printf("Took %s.\n", timer())
 }
-
-// func stopTimer(startTime time.Time) string {
-// 	duration := time.Now().Sub(startTime)
-// 	minutes := int(duration.Minutes())
-// 	seconds := int(duration.Seconds()) % 60
-// 	if minutes == 0 {
-// 		return fmt.Sprintf("%d seconds", seconds)
-// 	}
-// 	return fmt.Sprintf("%d minutes and %d seconds", minutes, seconds)
-// }
 
 func lambdaFolders() ([]string, error) {
 	matches, err := filepath.Glob("*/*.go")
@@ -315,308 +205,6 @@ func contains(strs []string, match string) bool {
 	return false
 }
 
-type data struct {
-	environ []string
-	s3      *s3.Client
-	bucket  string
-
-	signer         *signer.Client
-	signingProfile string
-	stagingPrefix  string
-
-	signingJobWaiter *signer.SuccessfulSigningJobWaiter
-
-	lambda                *lambda.Client
-	functionUpdatedWaiter *lambda.FunctionUpdatedV2Waiter
-
-	// things that depend on folder
-	folder         string
-	executablePath string
-	unsignedKey    string
-	signedKey      string
-}
-
-func (d *data) buildExecutable() error {
-	fmt.Printf("%s | Building executable.\n", d.folder)
-	cmd := exec.Command("go", "build", "-ldflags=-s -w", "-o", d.executablePath)
-	cmd.Dir = d.folder
-	cmd.Env = d.environ
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err := cmd.Run()
-	if err != nil {
-		fmt.Printf("%s | Failed to build executable: %s.\n", d.folder, err.Error())
-		return err
-	}
-	fmt.Printf("%s | Built executable.\n", d.folder)
-	return nil
-}
-
-func (d *data) zipExecutable() (io.Reader, error) {
-	fmt.Printf("%s | Zipping executable.\n", d.folder)
-	targetF := &bytes.Buffer{}
-	targetW := zip.NewWriter(targetF)
-	defer targetW.Close()
-	// create entry
-	entryW, err := targetW.Create("main")
-	if err != nil {
-		fmt.Printf("%s | Failed to zip executable: %s.\n", d.folder, err.Error())
-		return nil, err
-	}
-	// copy file into entry
-	sourceF, err := os.Open(d.executablePath)
-	if err != nil {
-		fmt.Printf("%s | Failed to zip executable: %s.\n", d.folder, err.Error())
-		return nil, err
-	}
-	defer sourceF.Close()
-	_, err = io.Copy(entryW, sourceF)
-	if err != nil {
-		fmt.Printf("%s | Failed to zip executable: %s.\n", d.folder, err.Error())
-		return nil, err
-	}
-	fmt.Printf("%s | Zipped executable.\n", d.folder)
-	return targetF, nil
-}
-
-func (d *data) sizeExecutable(r io.Reader) (io.Reader, error) {
-	fmt.Printf("%s | Getting size of unsigned deployment package.\n", d.folder)
-	copyBuf := &bytes.Buffer{}
-	//
-	lenBuf := &bytes.Buffer{}
-	//
-	_, err := lenBuf.ReadFrom(io.TeeReader(r, copyBuf))
-	if err != nil {
-		fmt.Printf("%s | Failed to get size of unsigned deployment package: %s.\n", d.folder, err.Error())
-		return nil, err
-	}
-	//
-	size := float64(lenBuf.Len()) / 1000000
-	//
-	fmt.Printf("%s | Size of unsigned deployment package: %.2f M.\n", d.folder, size)
-	//
-	return copyBuf, nil
-}
-
-func (d *data) hashExecutable(r io.Reader) (string, io.Reader, error) {
-	fmt.Printf("%s | Hashing unsigned deployment package.\n", d.folder)
-	copyBuf := &bytes.Buffer{}
-	h := sha256.New()
-	_, err := io.Copy(h, io.TeeReader(r, copyBuf))
-	if err != nil {
-		fmt.Printf("%s | Failed to hash unsigned deployment package: %s.\n", d.folder, err.Error())
-		return "", nil, err
-	}
-	hash := string(base64.StdEncoding.EncodeToString(h.Sum(nil)))
-	fmt.Printf("%s | Hashed unsigned deployment package: %s.\n", d.folder, hash)
-	return hash, copyBuf, nil
-
-}
-
-// Returns true if previous deployment package is up to date.
-// Returns an error API call failed.
-func (d *data) isUpToDate(unsignedHash string) (bool, error) {
-	fmt.Printf("%s | Checking if previous deployment package is up to date.\n", d.folder)
-	output, err := d.s3.HeadObject(context.TODO(), &s3.HeadObjectInput{
-		Bucket: aws.String(d.bucket),
-		Key:    aws.String(d.unsignedKey),
-	})
-	if err != nil {
-		var aerr *s3Types.NoSuchKey
-		if errors.As(err, &aerr) {
-			fmt.Printf("%s | Previous deployment package does not exist, proceeding.\n", d.folder)
-			return false, nil
-		}
-		fmt.Printf("%s | Failed to get previous deployment package: %s.\n", d.folder, err.Error())
-		return false, err
-	}
-	if output.Metadata == nil {
-		fmt.Printf("%s | Previous deployment package does not have metadata, proceeding.\n", d.folder)
-		return false, nil
-	}
-	previous, ok := output.Metadata["unsignedhash"]
-	if !ok {
-		fmt.Printf("%s | Previous deployment package does not have unsignedhash, proceeding.\n", d.folder)
-		return false, nil
-	}
-	if unsignedHash != previous {
-		fmt.Printf("%s | Previous deployment is out of date, proceeding: %s.\n", d.folder, previous)
-		return false, nil
-	}
-	fmt.Printf("%s | Deployment package is up to date, stopping.\n", d.folder)
-	return true, nil
-}
-
-func (d *data) putObject(reader io.Reader) (string, error) {
-	fmt.Printf("%s | Uploading unsigned deployment package to S3.\n", d.folder)
-	output, err := d.s3.PutObject(context.TODO(), &s3.PutObjectInput{
-		Bucket: aws.String(d.bucket),
-		Key:    aws.String(d.unsignedKey),
-		Body:   reader,
-	})
-	if err != nil {
-		fmt.Printf("%s | Failed to upload unsigned deployment package: %s\n", d.folder, err.Error())
-		return "", err
-	}
-	fmt.Printf("%s | Pushed unsigned deployment package to S3 with version ID: %s.\n", d.folder, *output.VersionId)
-	return *output.VersionId, nil
-}
-
-func (d *data) startSigningJob(version string) (string, error) {
-	fmt.Printf("%s | Starting signing job.\n", d.folder)
-	output, err := d.signer.StartSigningJob(context.TODO(), &signer.StartSigningJobInput{
-		ClientRequestToken: nil,
-		ProfileName:        aws.String(d.signingProfile),
-		Source: &signerTypes.Source{
-			S3: &signerTypes.S3Source{
-				BucketName: aws.String(d.bucket),
-				Key:        aws.String(d.unsignedKey),
-				Version:    aws.String(version),
-			},
-		},
-		Destination: &signerTypes.Destination{
-			S3: &signerTypes.S3Destination{
-				BucketName: aws.String(d.bucket),
-				Prefix:     aws.String(d.stagingPrefix + "/"),
-			},
-		},
-	})
-	if err != nil {
-		fmt.Printf("%s | Failed to start signing job: %s\n", d.folder, err.Error())
-		return "", err
-	}
-	fmt.Printf("%s | Started signing job with id: %s.\n", d.folder, *output.JobId)
-	return *output.JobId, nil
-}
-
-func (d *data) waitForSigningJob(jobId string) error {
-	fmt.Printf("%s | Waiting for signing job to complete.\n", d.folder)
-	err := d.signingJobWaiter.Wait(context.TODO(), &signer.DescribeSigningJobInput{
-		JobId: aws.String(jobId),
-	}, 30*time.Second)
-	if err != nil {
-		fmt.Printf("%s | Failed to wait for signing job to complete: %s\n", d.folder, err.Error())
-		return err
-	}
-	fmt.Printf("%s | Signing job is complete.\n", d.folder)
-	return nil
-}
-
-func deleteObject(client *s3.Client, bucket, key string) error {
-	// fmt.Printf("%s | Deleting object: %s/%s.\n", folder, bucket, key)
-	_, err := client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
-	})
-	if err != nil {
-		// fmt.Printf("%s | Failed to update Lambda function code: %s\n", folder, err.Error())
-		return err
-	}
-	// fmt.Printf("%s | Updated Lambda function code.\n", folder)
-	return nil
-}
-
-func (d *data) getObject(key string) (io.ReadCloser, error) {
-	fmt.Printf("%s | Downloading signed deployment package.\n", d.folder)
-	output, err := d.s3.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(d.bucket),
-		Key:    aws.String(key),
-	})
-	if err != nil {
-		fmt.Printf("%s | Failed to download signed deployment package: %s\n", d.folder, err.Error())
-		return nil, err
-	}
-	fmt.Printf("%s | Downloaded signed deployment package.\n", d.folder)
-	return output.Body, nil
-}
-
-func (d *data) hashObject(r io.Reader) (string, error) {
-	fmt.Printf("%s | Hashing signed deployment package.\n", d.folder)
-	h := sha256.New()
-	_, err := io.Copy(h, r)
-	if err != nil {
-		fmt.Printf("%s | Failed to hash signed deployment package: %s.\n", d.folder, err.Error())
-		return "", err
-	}
-	hash := string(base64.StdEncoding.EncodeToString(h.Sum(nil)))
-	fmt.Printf("%s | Hashed signed deployment package: %s.\n", d.folder, hash)
-	return hash, nil
-}
-
-func (d *data) copyObject(sourceKey string, metadata map[string]string) error {
-	fmt.Printf("%s | Copying signed deployment package to signed/.\n", d.folder)
-	_, err := d.s3.CopyObject(context.TODO(), &s3.CopyObjectInput{
-		CopySource:        aws.String(d.bucket + "/" + sourceKey),
-		Bucket:            aws.String(d.bucket),
-		Key:               aws.String(d.signedKey),
-		Metadata:          metadata,
-		MetadataDirective: s3Types.MetadataDirective("REPLACE"),
-	})
-	if err != nil {
-		fmt.Printf("%s | Failed to copy signed deployment package: %s\n", d.folder, err.Error())
-		return err
-	}
-	fmt.Printf("%s | Copied signed deployment package to signed/.\n", d.folder)
-	return nil
-}
-
-func (d *data) updateFunctionCode() error {
-	fmt.Printf("%s | Updating Lambda function code.\n", d.folder)
-	_, err := d.lambda.UpdateFunctionCode(context.TODO(), &lambda.UpdateFunctionCodeInput{
-		FunctionName: aws.String(d.folder),
-		S3Bucket:     aws.String(d.bucket),
-		S3Key:        aws.String(d.signedKey),
-	})
-	if err != nil {
-		fmt.Printf("%s | Failed to update Lambda function code: %s\n", d.folder, err.Error())
-		return err
-	}
-	fmt.Printf("%s | Updated Lambda function code.\n", d.folder)
-	return nil
-}
-
-func (d *data) waitForFunctionUpdate() error {
-	fmt.Printf("%s | Waiting for function code to update.\n", d.folder)
-	err := d.functionUpdatedWaiter.Wait(context.TODO(), &lambda.GetFunctionInput{
-		FunctionName: aws.String(d.folder),
-	}, 30*time.Second)
-	if err != nil {
-		fmt.Printf("%s | Failed to wait for function code to update: %s\n", d.folder, err.Error())
-		return err
-	}
-	fmt.Printf("%s | Function code is updated.\n", d.folder)
-	return nil
-}
-
-func (d *data) publishLambdaVersion(hash string) (string, error) {
-	fmt.Printf("%s | Publishing new version of Lambda function.\n", d.folder)
-	output, err := d.lambda.PublishVersion(context.TODO(), &lambda.PublishVersionInput{
-		FunctionName: aws.String(d.folder),
-		CodeSha256:   aws.String(hash),
-	})
-	if err != nil {
-		fmt.Printf("%s | Failed to publish function version: %s\n", d.folder, err.Error())
-		return "", err
-	}
-	fmt.Printf("%s | Published new version of Lambda function: %s.\n", d.folder, *output.Version)
-	return *output.Version, nil
-}
-
-func (d *data) updateFunctionAlias(version string) error {
-	fmt.Printf("%s | Updating alias of Lambda function.\n", d.folder)
-	_, err := d.lambda.UpdateAlias(context.TODO(), &lambda.UpdateAliasInput{
-		FunctionName:    aws.String(d.folder),
-		Name:            aws.String("TEST"),
-		FunctionVersion: aws.String(version),
-	})
-	if err != nil {
-		fmt.Printf("%s | Failed to update alias of Lambda function: %s\n", d.folder, err.Error())
-		return err
-	}
-	fmt.Printf("%s | Updated alias of Lambda function.\n", d.folder)
-	return nil
-}
-
 // Returns a function that returns a string.
 // Expects duration to be less than one hour.
 //
@@ -640,27 +228,6 @@ func newTimer() func() string {
 		}
 		return fmt.Sprintf("%d minutes and %d seconds", minutes, seconds)
 	}
-}
-
-func duplicateR(r io.Reader) (io.Reader, io.Reader) {
-	r2 := &bytes.Buffer{}
-	r1 := io.TeeReader(r, r2)
-	return r1, r2
-}
-
-func lenR(r io.Reader) int {
-	buf := &bytes.Buffer{}
-	buf.ReadFrom(r)
-	return buf.Len()
-}
-
-func hashR(r io.Reader) (string, error) {
-	h := sha256.New()
-	_, err := io.Copy(h, r)
-	if err != nil {
-		return "", err
-	}
-	return string(base64.StdEncoding.EncodeToString(h.Sum(nil))), nil
 }
 
 // func cleanBinaries(client *s3.Client, bucket, unsignedPrefix, stagingPrefix string) error {
@@ -711,7 +278,7 @@ func hashR(r io.Reader) (string, error) {
 // //         fmt.Printf("%s | Failed to lint folder: %s.\n", folder, err.Error())
 // //         return
 // //     }
-// //     fmt.Printf("%s | Linted folder. Took %s.\n", folder, t1())
+// //     fmt.Printf("%s | Lintefolder. Took %s.\n", folder, t1())
 // //
 // func lintFolder(dir string) error {
 // 	cmd := exec.Command("golangci-lint", "run")

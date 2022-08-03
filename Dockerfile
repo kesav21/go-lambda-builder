@@ -2,7 +2,7 @@
 
 FROM golang:1.18-buster AS build
 WORKDIR /app
-COPY go.mod go.sum main.go ./
+COPY go.mod go.sum main.go run.go ./
 RUN go mod tidy && go build -o /main && echo $PATH
 
 # deploy
