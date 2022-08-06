@@ -17,4 +17,13 @@ jobs:
 
     - name: Build Lambdas
       run: |
-        echo hello world
+        ls -la
+        go build
+        echo
+        ls -la
+        mv builder test/lambdas
+        cd test/lambdas
+        echo
+        ls -la
+        echo
+        ./builder
