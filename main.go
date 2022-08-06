@@ -1,11 +1,12 @@
-// kk
+// go-lambda-builder
 //
 //     ./builder \
-//         -bucket=flipx-binaries-test-us-east-1 \
+//         -bucket=kesav-go-lambda-builder-test \
 //         -signing-prefix=test/unsigned \
 //         -staging-prefix=test/staging \
 //         -signed-prefix=test/signed \
-//         -include=deleteProperty,getProperty \
+//         -signing-profile=test_signer \
+//         -include=testLambda1,testLambda2 \
 //         -exclude=internal \
 //         -no-update-functions \
 //         -force
@@ -29,7 +30,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/signer"
 )
 
-var envFlag = flag.String("env", "test", `Which enviroment to target. Must be "test" or "prod".`)
+var bucketFlag = flag.String("bucket", "", "Which bucket to use.")
+var unsignedPrefixFlag = flag.String("unsigned-prefix", "", "Where to upload unsigned deployment packages.")
+var stagingPrefixFlag = flag.String("staging-prefix", "", "Where to upload signed deployment packages for staging.")
+var signedPrefixFlag = flag.String("signed-prefix", "", "Where to upload unsigned deployment packages for consumption.")
+var signingProfileFlag = flag.String("signing-profile", "", "Which profile to use to sign deployment packages.")
 var foldersFlag = flag.String("folders", "", "Which folders to deploy.")
 var forceFlag = flag.Bool("force", false, "Deploy even if signed deployment package is up-to-date.")
 var noUpdateFunctionsFlag = flag.Bool("no-update-functions", false, "Do not update Lambda functions.")
@@ -64,20 +69,26 @@ var noUpdateFunctionsFlag = flag.Bool("no-update-functions", false, "Do not upda
 func main() {
 	timer := newTimer()
 
-	// err := os.Chdir("lambdas")
-	// if err != nil {
-	// 	panic(err)
-	// }
-
 	flag.Parse()
+
+	if bucketFlag == nil {
+		panic(`Flag "bucket" is required.`)
+	}
+	if unsignedPrefixFlag == nil {
+		panic(`Flag "unsigned-prefix" is required.`)
+	}
+	if stagingPrefixFlag == nil {
+		panic(`Flag "staging-prefix" is required.`)
+	}
+	if signedPrefixFlag == nil {
+		panic(`Flag "signed-prefix" is required.`)
+	}
+	if signingProfileFlag == nil {
+		panic(`Flag "signing-profile" is required.`)
+	}
 
 	noUpdateFunctions := *noUpdateFunctionsFlag
 	force := *forceFlag
-
-	env := "test"
-	if *envFlag != "test" && *envFlag != "prod" {
-		env = "test"
-	}
 
 	allFolders, err := lambdaFolders()
 	if err != nil {
@@ -110,13 +121,8 @@ func main() {
 	}
 
 	s3Client := s3.NewFromConfig(cfg)
-	bucket := fmt.Sprintf("flipx-binaries-%s-us-east-1", env)
-	unsignedPrefix := fmt.Sprintf("%s/unsigned", env)
-	stagingPrefix := fmt.Sprintf("%s/staging", env)
-	signedPrefix := fmt.Sprintf("%s/signed", env)
 
 	signerClient := signer.NewFromConfig(cfg)
-	signingProfile := env + "_signer"
 	signingJobWaiter := signer.NewSuccessfulSigningJobWaiter(
 		signerClient,
 		func(o *signer.SuccessfulSigningJobWaiterOptions) {
@@ -132,33 +138,23 @@ func main() {
 			o.MaxDelay = 10
 		})
 
-	// matches, err := filepath.Glob("/usr/local/go/bin")
-	// if err != nil {
-	// 	panic("kk")
-	// }
-	// for _, match := range matches {
-	// 	fmt.Printf("%s\n", match)
-	// }
-
-	// fmt.Printf("%s\n", os.Getenv("PATH"))
-
 	d := &data{
-		// ctx
+		// context to use in api calls
 		ctx: context.TODO(),
 		// flags
 		noUpdateFunctions: noUpdateFunctions,
 		force:             force,
-		// `go build` environment variables
+		// environment variables to pass to go build
 		environ: environ,
 		// s3 config
 		s3:             s3Client,
-		bucket:         bucket,
-		unsignedPrefix: unsignedPrefix,
-		stagingPrefix:  stagingPrefix,
-		signedPrefix:   signedPrefix,
+		bucket:         *bucketFlag,
+		unsignedPrefix: *unsignedPrefixFlag,
+		stagingPrefix:  *stagingPrefixFlag,
+		signedPrefix:   *signedPrefixFlag,
 		// signer config
 		signer:           signerClient,
-		signingProfile:   signingProfile,
+		signingProfile:   *signingProfileFlag,
 		signingJobWaiter: signingJobWaiter,
 		// lambda config
 		lambda:                lambdaClient,
@@ -231,78 +227,3 @@ func newTimer() func() string {
 		return fmt.Sprintf("%d minutes and %d seconds", minutes, seconds)
 	}
 }
-
-// func cleanBinaries(client *s3.Client, bucket, unsignedPrefix, stagingPrefix string) error {
-// 	fmt.Printf("Cleaning %s/%s and %s/%s.\n", bucket, unsignedPrefix, bucket, stagingPrefix)
-// 	//
-// 	unsignedOutput, err := client.ListObjectsV2(context.TODO(), &s3.ListObjectsV2Input{
-// 		Bucket: &bucket,
-// 		Prefix: &unsignedPrefix,
-// 	})
-// 	//
-// 	stagingOutput, err := client.ListObjectsV2(context.TODO(), &s3.ListObjectsV2Input{
-// 		Bucket: &bucket,
-// 		Prefix: &stagingPrefix,
-// 	})
-// 	//
-// 	prefixes := make([]s3Types.ObjectIdentifier, 0, len(unsignedOutput.Contents)+len(stagingOutput.Contents))
-// 	for _, content := range unsignedOutput.Contents {
-// 		prefixes = append(prefixes, s3Types.ObjectIdentifier{Key: content.Key})
-// 	}
-// 	for _, content := range stagingOutput.Contents {
-// 		prefixes = append(prefixes, s3Types.ObjectIdentifier{Key: content.Key})
-// 	}
-// 	if len(prefixes) == 0 {
-// 		fmt.Printf("Nothing to delete.\n")
-// 		return nil
-// 	}
-// 	//
-// 	deleteOutput, err := client.DeleteObjects(context.TODO(), &s3.DeleteObjectsInput{
-// 		Bucket: &bucket,
-// 		Delete: &s3Types.Delete{
-// 			Objects: prefixes,
-// 		},
-// 	})
-// 	if err != nil {
-// 		return err
-// 	}
-// 	for _, deleted := range deleteOutput.Deleted {
-// 		fmt.Printf("Deleted %s.\n", *deleted.Key)
-// 	}
-// 	return nil
-// }
-
-// //
-// //     fmt.Printf("%s | Linting folder.\n", folder)
-// //     t1 := newTimer()
-// //     err = lintFolder(folder)
-// //     if err != nil {
-// //         fmt.Printf("%s | Failed to lint folder: %s.\n", folder, err.Error())
-// //         return
-// //     }
-// //     fmt.Printf("%s | Lintefolder. Took %s.\n", folder, t1())
-// //
-// func lintFolder(dir string) error {
-// 	cmd := exec.Command("golangci-lint", "run")
-// 	cmd.Dir = dir
-// 	cmd.Stdout = os.Stdout
-// 	cmd.Stderr = os.Stderr
-// 	return cmd.Run()
-// }
-
-// //
-// //     fmt.Printf("%s | Compressing executable.\n", folder)
-// //     t3 = newTimer()
-// //     err = compressExecutable(executablePath)
-// //     if err != nil {
-// //         fmt.Printf("%s | Failed to compress executable: %s.\n", folder, err.Error())
-// //         return
-// //     }
-// //     fmt.Printf("%s | Compressed executable. Took %s.\n", folder, t3())
-// //
-// func compressExecutable(executablePath string) error {
-// 	cmd := exec.Command("upx", "-qqq", executablePath)
-// 	cmd.Stdout = os.Stdout
-// 	cmd.Stderr = os.Stderr
-// 	return cmd.Run()
-// }

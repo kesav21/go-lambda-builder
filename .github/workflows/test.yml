@@ -2,6 +2,10 @@ name: Test
 
 on: push
 
+env:
+  AWS_ACCESS_KEY_ID: ${{secrets.AWS_ACCESS_KEY_ID}}
+  AWS_SECRET_ACCESS_KEY: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+
 jobs:
   build-lambdas:
     runs-on: ubuntu-latest
@@ -17,13 +21,13 @@ jobs:
 
     - name: Build Lambdas
       run: |
-        ls -la
         go build
-        echo
-        ls -la
         mv builder test/lambdas
         cd test/lambdas
-        echo
-        ls -la
-        echo
-        ./builder
+        ./builder \
+            -bucket=kesav-go-lambda-cleanup-test \
+            -unsigned-prefix=test/unsigned \
+            -staging-prefix=test/staging \
+            -signed-prefix=test/signed \
+            -signing-profile=test_signer
+

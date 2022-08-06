@@ -14,6 +14,6 @@ clean:
 	@rm -f builder ../backend-api-functions/lambdas/builder
 
 edit:
-	@nvim Makefile Dockerfile main.go run.go
+	@nvim Makefile main.go run.go
 
 .PHONY: image clean run edit
