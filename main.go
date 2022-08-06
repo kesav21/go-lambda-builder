@@ -143,22 +143,24 @@ func main() {
 	// fmt.Printf("%s\n", os.Getenv("PATH"))
 
 	d := &data{
-		//
+		// ctx
+		ctx: context.TODO(),
+		// flags
 		noUpdateFunctions: noUpdateFunctions,
 		force:             force,
-		//
+		// `go build` environment variables
 		environ: environ,
-		//
+		// s3 config
 		s3:             s3Client,
 		bucket:         bucket,
 		unsignedPrefix: unsignedPrefix,
 		stagingPrefix:  stagingPrefix,
 		signedPrefix:   signedPrefix,
-		//
+		// signer config
 		signer:           signerClient,
 		signingProfile:   signingProfile,
 		signingJobWaiter: signingJobWaiter,
-		//
+		// lambda config
 		lambda:                lambdaClient,
 		functionUpdatedWaiter: functionUpdatedWaiter,
 	}
