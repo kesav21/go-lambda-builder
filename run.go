@@ -309,7 +309,7 @@ func (d *data) putObject(folder, unsignedKey string, reader io.Reader) (string, 
 	fmt.Printf(
 		"%s | Pushed unsigned deployment package to S3 with version ID: %s.\n",
 		folder,
-		*output.VersionId,
+		*output.VersionId, // what if versioning is not enabled on the bucket?
 	)
 	return *output.VersionId, nil
 }
