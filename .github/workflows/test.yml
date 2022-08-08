@@ -25,6 +25,7 @@ jobs:
         mv builder test/lambdas
         cd test/lambdas
         ./builder \
+            -region=us-east-1 \
             -bucket=kesav-go-lambda-builder-test \
             -unsigned-prefix=test/unsigned \
             -staging-prefix=test/staging \
