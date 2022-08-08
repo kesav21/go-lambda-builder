@@ -1,9 +1,30 @@
 // go-lambda-builder
 //
-//     ./builder \
+// Usage:
+//
+//     builder \
+//         -profile=kk \
 //         -bucket=kesav-go-lambda-builder-test \
-//         -signing-prefix=test/unsigned \
+//         -unsigned-prefix=test/unsigned \
 //         -staging-prefix=test/staging \
+//         -signed-prefix=test/signed \
+//         -signing-profile=main \
+//         -folders=testLambda1,testLambda2 \
+//         -no-update-functions \
+//         -force
+//
+// TODO(kesav): make the flags look like this:
+//
+//     builder \
+//         -chdir=test/lambdas \
+//         -region=us-west-2 \
+//         -profile=kk \
+//         -unsigned-bucket-versioning-enabled \
+//         -unsigned-bucket=kesav-go-lambda-builder-test \
+//         -unsigned-prefix=test/unsigned \
+//         -staging-bucket=kesav-go-lambda-builder-test \
+//         -staging-prefix=test/staging \
+//         -signed-bucket=kesav-go-lambda-builder-test \
 //         -signed-prefix=test/signed \
 //         -signing-profile=test_signer \
 //         -include=testLambda1,testLambda2 \
@@ -21,7 +42,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -30,25 +50,30 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/signer"
 )
 
+// required
 var bucketFlag = flag.String("bucket", "", "Which bucket to use.")
 var unsignedPrefixFlag = flag.String("unsigned-prefix", "", "Where to upload unsigned deployment packages.")
 var stagingPrefixFlag = flag.String("staging-prefix", "", "Where to upload signed deployment packages for staging.")
 var signedPrefixFlag = flag.String("signed-prefix", "", "Where to upload unsigned deployment packages for consumption.")
 var signingProfileFlag = flag.String("signing-profile", "", "Which profile to use to sign deployment packages.")
+
+// optional
+var regionFlag = flag.String("region", "", "Which AWS region to use.")
+var profileFlag = flag.String("profile", "", "Which AWS profile to use.")
 var foldersFlag = flag.String("folders", "", "Which folders to deploy.")
 var forceFlag = flag.Bool("force", false, "Deploy even if signed deployment package is up-to-date.")
 var noUpdateFunctionsFlag = flag.Bool("no-update-functions", false, "Do not update Lambda functions.")
 
-// var noPackFlag = flag.String("no-pack", "", "Which folders to deploy.")
-// var aggressivePackFlag = flag.String("aggressive-pack", "", "Which folders to deploy.")
-
-// This must be run from the lambdas folder
-//
-// TODO(kesav): use upx to make binaries smaller
 // TODO(kesav): look into ClientRequestToken
 // TODO(kesav): check out https://aws.amazon.com/blogs/compute/migrating-aws-lambda-functions-to-arm-based-aws-graviton2-processors/
 // TODO(kesav): assign each step a color so it's easier to tell the overall progress
 // TODO(kesav): check out the s3 upload manager https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/feature/s3/manager#Uploader
+// TODO(kesav): add flags for unsigned-bucket, staging-bucket, and signed-bucket
+// TODO(kesav): make signing-profile optional, and don't run a signer job if not passed in
+// TODO(kesav): do not require bucket versioning to be enabled
+// TODO(kesav): record and print durations for every step
+// TODO(kesav): change format of timer to 0m0s000ms
+// TODO(kesav): read options from ~/.config/go-lambda-builder/config.hcl
 //
 // if you run two zips on the same input, the hashes of the outputs will be the same
 //
@@ -107,7 +132,7 @@ func main() {
 		fmt.Printf("Only deploying %s.\n\n", strings.Join(folders, ", "))
 	} else {
 		folders = allFolders
-		fmt.Printf("Deploying all folders.\n")
+		fmt.Printf("Deploying all folders.\n\n")
 	}
 
 	environ := os.Environ()
@@ -115,7 +140,14 @@ func main() {
 	environ = append(environ, "GOARCH=amd64")
 	environ = append(environ, "CGO_ENABLED=0")
 
-	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("us-east-1"))
+	var opts []func(*config.LoadOptions) error
+	if regionFlag != nil {
+		opts = append(opts, config.WithRegion(*regionFlag))
+	}
+	if profileFlag != nil {
+		opts = append(opts, config.WithSharedConfigProfile(*profileFlag))
+	}
+	cfg, err := config.LoadDefaultConfig(context.TODO(), opts...)
 	if err != nil {
 		panic(err)
 	}
@@ -161,15 +193,33 @@ func main() {
 		functionUpdatedWaiter: functionUpdatedWaiter,
 	}
 
-	wg := sync.WaitGroup{}
+	type result struct {
+		string
+		error
+	}
+	results := make(chan result, len(folders))
 	for _, folder := range folders {
-		wg.Add(1)
 		go func(folder string) {
-			defer wg.Done()
-			d.run(folder)
+			results <- result{folder, d.run(folder)}
 		}(folder)
 	}
-	wg.Wait()
+
+	numResults := 0
+	failures := []string{}
+	for result := range results {
+		numResults++
+		if result.error != nil {
+			failures = append(failures, result.string)
+		}
+		if numResults == len(folders) {
+			close(results)
+		}
+	}
+
+	if len(failures) != 0 {
+		fmt.Printf("\n")
+		fmt.Printf("Failures: %s.\n", strings.Join(failures, ","))
+	}
 
 	fmt.Printf("\n")
 	fmt.Printf("Took %s.\n", timer())

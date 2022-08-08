@@ -46,60 +46,60 @@ type data struct {
 	functionUpdatedWaiter *lambda.FunctionUpdatedV2Waiter
 }
 
-func (d *data) run(folder string) {
+func (d *data) run(folder string) error {
 	executablePath := fmt.Sprintf("/tmp/%s", folder)
 	unsignedKey := fmt.Sprintf("%s/%s.zip", d.unsignedPrefix, folder)
 	signedKey := fmt.Sprintf("%s/%s.zip", d.signedPrefix, folder)
 	//
 	unsignedHash, err := d.hashSourceCode(folder)
 	if err != nil {
-		return
+		return err
 	}
 	if !d.force {
 		isUpToDate, err := d.isUpToDate(folder, signedKey, unsignedHash)
 		if err != nil {
-			return
+			return err
 		}
 		if isUpToDate {
-			return
+			return nil
 		}
 	}
 	err = d.buildExecutable(folder, executablePath)
 	if err != nil {
-		return
+		return err
 	}
 	defer d.deleteFile(folder, executablePath)
 	unsignedR, err := d.zipExecutable(folder, executablePath)
 	if err != nil {
-		return
+		return err
 	}
 	unsignedR1, err := d.sizeExecutable(folder, unsignedR)
 	if err != nil {
-		return
+		return err
 	}
 	objectVersion, err := d.putObject(folder, unsignedKey, unsignedR1)
 	if err != nil {
-		return
+		return err
 	}
 	defer d.deleteObject(folder, unsignedKey)
 	jobId, err := d.startSigningJob(folder, unsignedKey, objectVersion)
 	if err != nil {
-		return
+		return err
 	}
 	stagingKey := d.stagingPrefix + "/" + jobId + ".zip"
 	err = d.waitForSigningJob(folder, jobId)
 	if err != nil {
-		return
+		return err
 	}
 	defer d.deleteObject(folder, stagingKey)
 	signedR, err := d.getObject(folder, stagingKey)
 	if err != nil {
-		return
+		return err
 	}
 	defer signedR.Close()
 	signedHash, err := d.hashObject(folder, signedR)
 	if err != nil {
-		return
+		return err
 	}
 	err = d.copyObject(folder, stagingKey, signedKey, map[string]string{
 		"unsignedHash":     unsignedHash,
@@ -107,27 +107,28 @@ func (d *data) run(folder string) {
 		"source-code-hash": signedHash,
 	})
 	if err != nil {
-		return
+		return err
 	}
 	if d.noUpdateFunctions {
-		return
+		return nil
 	}
 	err = d.updateFunctionCode(folder, signedKey)
 	if err != nil {
-		return
+		return err
 	}
 	err = d.waitForFunctionUpdate(folder)
 	if err != nil {
-		return
+		return err
 	}
 	functionVersion, err := d.publishLambdaVersion(folder, signedHash)
 	if err != nil {
-		return
+		return err
 	}
 	err = d.updateFunctionAlias(folder, functionVersion)
 	if err != nil {
-		return
+		return err
 	}
+	return nil
 }
 
 func (d *data) hashSourceCode(folder string) (string, error) {
