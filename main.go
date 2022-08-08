@@ -216,13 +216,13 @@ func main() {
 		}
 	}
 
-	if len(failures) != 0 {
-		fmt.Printf("\n")
-		fmt.Printf("Failures: %s.\n", strings.Join(failures, ","))
-	}
-
 	fmt.Printf("\n")
 	fmt.Printf("Took %s.\n", timer())
+
+	if len(failures) != 0 {
+		sort.Sort(sort.StringSlice(failures))
+		panic(fmt.Sprintf("Failures: %s.\n", strings.Join(failures, ",")))
+	}
 }
 
 func lambdaFolders() ([]string, error) {
