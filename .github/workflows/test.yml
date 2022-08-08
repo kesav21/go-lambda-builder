@@ -19,10 +19,13 @@ jobs:
         go-version: 1.18
         check-latest: true
 
-    - name: Build Lambdas
+    - name: Build Builder
       run: |
         go build
         mv builder test/lambdas
+
+    - name: Run Builder
+      run: |
         cd test/lambdas
         ./builder \
             -region=us-east-1 \
