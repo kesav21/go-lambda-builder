@@ -216,8 +216,7 @@ func main() {
 		}
 	}
 
-	fmt.Printf("\n")
-	fmt.Printf("Took %s.\n", timer())
+	fmt.Printf("\nTook %s.\n\n", timer())
 
 	if len(failures) != 0 {
 		sort.Sort(sort.StringSlice(failures))

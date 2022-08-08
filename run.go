@@ -266,10 +266,9 @@ func (d *data) isUpToDate(folder, signedKey string, unsignedHash string) (bool, 
 	})
 	if err != nil {
 		fmt.Printf(
-			"%s | Failed to get previous deployment package %s, proceeding: %s.\n",
+			"%s | Failed to get previous deployment package %s, proceeding.\n",
 			folder,
 			signedKey,
-			err.Error(),
 		)
 		return false, nil
 	}
