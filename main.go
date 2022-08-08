@@ -221,7 +221,7 @@ func main() {
 
 	if len(failures) != 0 {
 		sort.Sort(sort.StringSlice(failures))
-		panic(fmt.Sprintf("Failures: %s.\n", strings.Join(failures, ",")))
+		panic(fmt.Sprintf("Failures: %s.", strings.Join(failures, ",")))
 	}
 }
 

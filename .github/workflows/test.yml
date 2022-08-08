@@ -24,6 +24,10 @@ jobs:
         go build
         mv builder test/lambdas
 
+    - name: Remove test/signed/testLambda2
+      run: |
+        aws s3 rm s3://kesav-go-lambda-builder-test/test/signed/testLambda2.zip
+
     - name: Run Builder
       run: |
         cd test/lambdas
