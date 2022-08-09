@@ -27,6 +27,9 @@ type data struct {
 	// context to use in api calls
 	ctx context.Context
 	// flags
+	noUpload          bool
+	noSigningJobs     bool
+	noCopySigned      bool
 	noUpdateFunctions bool
 	force             bool
 	// environment variables to pass to go build
@@ -77,11 +80,17 @@ func (d *data) run(folder string) error {
 	if err != nil {
 		return err
 	}
+	if d.noUpload {
+		return nil
+	}
 	objectVersion, err := d.putObject(folder, unsignedKey, unsignedR1)
 	if err != nil {
 		return err
 	}
 	defer d.deleteObject(folder, unsignedKey)
+	if d.noSigningJobs {
+		return nil
+	}
 	jobId, err := d.startSigningJob(folder, unsignedKey, objectVersion)
 	if err != nil {
 		return err
@@ -100,6 +109,9 @@ func (d *data) run(folder string) error {
 	signedHash, err := d.hashObject(folder, signedR)
 	if err != nil {
 		return err
+	}
+	if d.noCopySigned {
+		return nil
 	}
 	err = d.copyObject(folder, stagingKey, signedKey, map[string]string{
 		"unsignedHash":     unsignedHash,
@@ -173,15 +185,14 @@ func (d *data) hashSourceCode(folder string) (string, error) {
 	return hash, nil
 }
 
-func (d *data) deleteFile(folder, path string) error {
+func (d *data) deleteFile(folder, path string) {
 	fmt.Printf("%s | Deleting file: %s.\n", folder, path)
 	err := os.Remove(path)
 	if err != nil {
 		fmt.Printf("%s | Failed to delete file (%s): %s.\n", folder, path, err.Error())
-		return err
+		return
 	}
 	fmt.Printf("%s | Deleted file: %s.\n", folder, path)
-	return nil
 }
 
 func (d *data) buildExecutable(folder, executablePath string) error {
@@ -354,7 +365,7 @@ func (d *data) waitForSigningJob(folder string, jobId string) error {
 	return nil
 }
 
-func (d *data) deleteObject(folder, key string) error {
+func (d *data) deleteObject(folder, key string) {
 	fmt.Printf("%s | Deleting object: %s.\n", folder, key)
 	_, err := d.s3.DeleteObject(d.ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(d.bucket),
@@ -362,10 +373,9 @@ func (d *data) deleteObject(folder, key string) error {
 	})
 	if err != nil {
 		fmt.Printf("%s | Failed to delete object (%s): %s\n", folder, key, err.Error())
-		return err
+		return
 	}
 	fmt.Printf("%s | Deleted object: %s.\n", folder, key)
-	return nil
 }
 
 func (d *data) getObject(folder string, key string) (io.ReadCloser, error) {

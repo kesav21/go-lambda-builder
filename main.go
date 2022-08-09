@@ -62,6 +62,9 @@ var regionFlag = flag.String("region", "", "Which AWS region to use.")
 var profileFlag = flag.String("profile", "", "Which AWS profile to use.")
 var foldersFlag = flag.String("folders", "", "Which folders to deploy.")
 var forceFlag = flag.Bool("force", false, "Deploy even if signed deployment package is up-to-date.")
+var noUploadFlag = flag.Bool("no-upload", false, "Do not upload unsigned deployment packages to S3.")
+var noSigningJobsFlag = flag.Bool("no-signing-jobs", false, "Do not run any signing jobs.")
+var noCopySignedFlag = flag.Bool("no-copy-signed", false, "Do not copy signed deployment packages to signed prefix.")
 var noUpdateFunctionsFlag = flag.Bool("no-update-functions", false, "Do not update Lambda functions.")
 
 // TODO(kesav): look into ClientRequestToken
@@ -174,6 +177,9 @@ func main() {
 		// context to use in api calls
 		ctx: context.TODO(),
 		// flags
+		noUpload:          *noUploadFlag,
+		noSigningJobs:     *noSigningJobsFlag,
+		noCopySigned:      *noCopySignedFlag,
 		noUpdateFunctions: noUpdateFunctions,
 		force:             force,
 		// environment variables to pass to go build
@@ -219,7 +225,7 @@ func main() {
 	fmt.Printf("\nTook %s.\n\n", timer())
 
 	if len(failures) != 0 {
-		sort.Sort(sort.StringSlice(failures))
+		sort.Strings(failures)
 		panic(strings.Join(failures, ", "))
 	}
 }
@@ -238,7 +244,7 @@ func lambdaFolders() ([]string, error) {
 		}
 		folders = append(folders, dir)
 	}
-	sort.Sort(sort.StringSlice(folders))
+	sort.Strings(folders)
 	return folders, nil
 }
 
@@ -267,7 +273,7 @@ func contains(strs []string, match string) bool {
 func newTimer() func() string {
 	startTime := time.Now()
 	return func() string {
-		duration := time.Now().Sub(startTime)
+		duration := time.Since(startTime)
 		minutes := int(duration.Minutes())
 		seconds := int(duration.Seconds()) % 60
 		if minutes == 0 {
