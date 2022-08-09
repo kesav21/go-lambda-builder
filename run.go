@@ -27,6 +27,9 @@ type data struct {
 	// context to use in api calls
 	ctx context.Context
 	// flags
+	noUpload          bool
+	noSigningJobs     bool
+	noCopySigned      bool
 	noUpdateFunctions bool
 	force             bool
 	// environment variables to pass to go build

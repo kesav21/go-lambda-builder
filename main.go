@@ -62,6 +62,9 @@ var regionFlag = flag.String("region", "", "Which AWS region to use.")
 var profileFlag = flag.String("profile", "", "Which AWS profile to use.")
 var foldersFlag = flag.String("folders", "", "Which folders to deploy.")
 var forceFlag = flag.Bool("force", false, "Deploy even if signed deployment package is up-to-date.")
+var noUploadFlag = flag.Bool("no-upload", false, "Do not upload unsigned deployment packages to S3.")
+var noSigningJobsFlag = flag.Bool("no-signing-jobs", false, "Do not run any signing jobs.")
+var noCopySignedFlag = flag.Bool("no-copy-signed", false, "Do not copy signed deployment packages to signed prefix.")
 var noUpdateFunctionsFlag = flag.Bool("no-update-functions", false, "Do not update Lambda functions.")
 
 // TODO(kesav): look into ClientRequestToken
@@ -174,6 +177,9 @@ func main() {
 		// context to use in api calls
 		ctx: context.TODO(),
 		// flags
+		noUpload:          *noUploadFlag,
+		noSigningJobs:     *noSigningJobsFlag,
+		noCopySigned:      *noCopySignedFlag,
 		noUpdateFunctions: noUpdateFunctions,
 		force:             force,
 		// environment variables to pass to go build
