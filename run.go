@@ -80,11 +80,17 @@ func (d *data) run(folder string) error {
 	if err != nil {
 		return err
 	}
+	if !d.noUpload {
+		return nil
+	}
 	objectVersion, err := d.putObject(folder, unsignedKey, unsignedR1)
 	if err != nil {
 		return err
 	}
 	defer d.deleteObject(folder, unsignedKey)
+	if !d.noSigningJobs {
+		return nil
+	}
 	jobId, err := d.startSigningJob(folder, unsignedKey, objectVersion)
 	if err != nil {
 		return err
@@ -103,6 +109,9 @@ func (d *data) run(folder string) error {
 	signedHash, err := d.hashObject(folder, signedR)
 	if err != nil {
 		return err
+	}
+	if !d.noCopySigned {
+		return nil
 	}
 	err = d.copyObject(folder, stagingKey, signedKey, map[string]string{
 		"unsignedHash":     unsignedHash,
