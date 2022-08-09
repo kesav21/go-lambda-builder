@@ -225,7 +225,7 @@ func main() {
 	fmt.Printf("\nTook %s.\n\n", timer())
 
 	if len(failures) != 0 {
-		sort.Sort(sort.StringSlice(failures))
+		sort.Strings(failures)
 		panic(strings.Join(failures, ", "))
 	}
 }
@@ -244,7 +244,7 @@ func lambdaFolders() ([]string, error) {
 		}
 		folders = append(folders, dir)
 	}
-	sort.Sort(sort.StringSlice(folders))
+	sort.Strings(folders)
 	return folders, nil
 }
 
@@ -273,7 +273,7 @@ func contains(strs []string, match string) bool {
 func newTimer() func() string {
 	startTime := time.Now()
 	return func() string {
-		duration := time.Now().Sub(startTime)
+		duration := time.Since(startTime)
 		minutes := int(duration.Minutes())
 		seconds := int(duration.Seconds()) % 60
 		if minutes == 0 {
