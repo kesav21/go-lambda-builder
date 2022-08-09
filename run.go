@@ -80,7 +80,7 @@ func (d *data) run(folder string) error {
 	if err != nil {
 		return err
 	}
-	if !d.noUpload {
+	if d.noUpload {
 		return nil
 	}
 	objectVersion, err := d.putObject(folder, unsignedKey, unsignedR1)
@@ -88,7 +88,7 @@ func (d *data) run(folder string) error {
 		return err
 	}
 	defer d.deleteObject(folder, unsignedKey)
-	if !d.noSigningJobs {
+	if d.noSigningJobs {
 		return nil
 	}
 	jobId, err := d.startSigningJob(folder, unsignedKey, objectVersion)
@@ -110,7 +110,7 @@ func (d *data) run(folder string) error {
 	if err != nil {
 		return err
 	}
-	if !d.noCopySigned {
+	if d.noCopySigned {
 		return nil
 	}
 	err = d.copyObject(folder, stagingKey, signedKey, map[string]string{
