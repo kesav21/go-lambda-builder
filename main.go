@@ -72,9 +72,8 @@ var noUploadFlag = flag.Bool("no-upload", false, "Do not upload unsigned deploym
 var noSignFlag = flag.Bool("no-sign", false, "Do not run any signing jobs.")
 var noCopySignedFlag = flag.Bool("no-copy-signed", false, "Do not copy signed deployment packages to signed prefix.")
 var noUpdateFunctionsFlag = flag.Bool("no-update-functions", false, "Do not update Lambda functions.")
-
 var instanceFlag = flag.Int("instance", 0, "Which instance this builder is.")
-var numInstancesFlag = flag.Int("num-instances", 0, "Total number of instances running.")
+var numInstancesFlag = flag.Int("num-instances", 0, "Number of instances running.")
 
 // TODO(kesav): look into ClientRequestToken
 // TODO(kesav): check out https://aws.amazon.com/blogs/compute/migrating-aws-lambda-functions-to-arm-based-aws-graviton2-processors/
@@ -146,7 +145,7 @@ func main() {
 	}
 
 	if instanceFlag != nil && numInstancesFlag != nil {
-		fmt.Printf("Running instance %d.\n", *instanceFlag)
+		fmt.Printf("Running instance %d.\n\n", *instanceFlag)
 		var chunks [][]string
 		chunkSize := (len(folders) + *numInstancesFlag - 1) / *numInstancesFlag
 		for i := 0; i < len(folders); i += chunkSize {
@@ -159,7 +158,6 @@ func main() {
 		folders = chunks[*instanceFlag]
 	}
 
-	// fmt.Printf("Deploying all folders.\n\n")
 	fmt.Printf("Deploying %s.\n\n", strings.Join(folders, ", "))
 
 	environ := os.Environ()
