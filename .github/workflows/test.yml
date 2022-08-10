@@ -38,7 +38,8 @@ jobs:
             -staging-prefix=test/staging \
             -signed-prefix=test/signed \
             -signing-profile=main \
-            -no-update-functions
+            -no-update-functions \
+            -force
         # aws s3 ls --recursive kesav-go-lambda-builder-test
 
     # - name: Run Builder with -no-copy-signed
