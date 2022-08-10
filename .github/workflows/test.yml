@@ -30,7 +30,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: builder
-        path: /tmp/builder
+        path: builder
 
     - name: Remove test/signed/testLambda2
       run: |
