@@ -59,6 +59,7 @@ jobs:
       run: |
         pwd
         ls -la
+        chmod +x builder
         mv builder test/lambdas
         cd test/lambdas
         ./builder \
