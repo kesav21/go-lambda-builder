@@ -145,7 +145,7 @@ func main() {
 	}
 
 	if instanceFlag != nil && numInstancesFlag != nil {
-		fmt.Printf("Running instance %d.\n\n", *instanceFlag)
+		fmt.Printf("Running instance %d of %d.\n\n", *instanceFlag, *numInstancesFlag)
 		var chunks [][]string
 		chunkSize := (len(folders) + *numInstancesFlag - 1) / *numInstancesFlag
 		for i := 0; i < len(folders); i += chunkSize {
