@@ -8,7 +8,7 @@ env:
   AWS_SECRET_ACCESS_KEY: ${{secrets.AWS_SECRET_ACCESS_KEY}}
 
 jobs:
-  build-lambdas:
+  build-builder:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -23,25 +23,43 @@ jobs:
     - name: Build Builder
       run: |
         go build
-        mv builder test/lambdas
+
+    - name: Archive Builder
+      uses: actions/upload-artifact@v3
+      with:
+        name: builder
+        path: builder
 
     - name: Remove test/signed/testLambda2
       run: |
         aws s3 rm s3://kesav-go-lambda-builder-test/test/signed/testLambda2.zip
 
+  build-lambdas:
+    runs-on: ubuntu-latest
+    needs:
+    - build-builder
+    strategy:
+      matrix:
+        instance: [0,1,2,3,4,5,6,7,8,9]
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Setup Go
+      uses: actions/setup-go@v3.1.0
+      with:
+        go-version: 1.18
+        check-latest: true
+
+    - name: Download Builder
+      uses: actions/download-artifact@v3
+      with:
+        name: builder
+
     - name: Run Builder
       run: |
-        cd test/lambdas
-        ./builder \
-            -bucket=kesav-go-lambda-builder-test \
-            -unsigned-prefix=test/unsigned \
-            -staging-prefix=test/staging \
-            -signed-prefix=test/signed \
-            -signing-profile=main
-        aws s3 ls --recursive kesav-go-lambda-builder-test
-
-    - name: Run Builder with -no-copy-signed
-      run: |
+        chmod +x builder
+        mv builder test/lambdas
         cd test/lambdas
         ./builder \
             -bucket=kesav-go-lambda-builder-test \
@@ -49,7 +67,20 @@ jobs:
             -staging-prefix=test/staging \
             -signed-prefix=test/signed \
             -signing-profile=main \
+            -no-update-functions \
             -force \
-            -no-copy-signed
-        aws s3 ls --recursive kesav-go-lambda-builder-test
+            -instance=${{ strategy.job-index }} \
+            -num-instances=${{ strategy.job-total }} \
+
+  clean-builder:
+    runs-on: ubuntu-latest
+    if: ${{ always() }}
+    needs:
+    - build-builder
+    - build-lambdas
+    steps:
+    - name: Delete Builder
+      uses: geekyeggo/delete-artifact@v1
+      with:
+        name: builder
 

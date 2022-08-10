@@ -58,7 +58,9 @@ func (d *data) run(folder string) error {
 	if err != nil {
 		return err
 	}
-	if !d.force {
+	if d.force {
+		fmt.Printf("%s | Not checking if previous deployment package is up to date.\n", folder)
+	} else {
 		isUpToDate, err := d.isUpToDate(folder, signedKey, unsignedHash)
 		if err != nil {
 			return err
@@ -81,6 +83,7 @@ func (d *data) run(folder string) error {
 		return err
 	}
 	if d.noUpload {
+		fmt.Printf("%s | Not uploading unsigned deployment package to S3.\n", folder)
 		return nil
 	}
 	objectVersion, err := d.putObject(folder, unsignedKey, unsignedR1)
@@ -89,6 +92,7 @@ func (d *data) run(folder string) error {
 	}
 	defer d.deleteObject(folder, unsignedKey)
 	if d.noSigningJobs {
+		fmt.Printf("%s | Not starting signing job.\n", folder)
 		return nil
 	}
 	jobId, err := d.startSigningJob(folder, unsignedKey, objectVersion)
@@ -111,6 +115,7 @@ func (d *data) run(folder string) error {
 		return err
 	}
 	if d.noCopySigned {
+		fmt.Printf("%s | Not copying signed deployment package to signed/.\n", folder)
 		return nil
 	}
 	err = d.copyObject(folder, stagingKey, signedKey, map[string]string{
@@ -122,6 +127,7 @@ func (d *data) run(folder string) error {
 		return err
 	}
 	if d.noUpdateFunctions {
+		fmt.Printf("%s | Not updating Lambda function code.\n", folder)
 		return nil
 	}
 	err = d.updateFunctionCode(folder, signedKey)
@@ -200,8 +206,9 @@ func (d *data) buildExecutable(folder, executablePath string) error {
 	cmd := exec.Command("go", "build", "-ldflags=-s -w", "-o", executablePath)
 	cmd.Dir = folder
 	cmd.Env = d.environ
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// don't print the output of go build
+	// cmd.Stdout = os.Stdout
+	// cmd.Stderr = os.Stderr
 	err := cmd.Run()
 	if err != nil {
 		fmt.Printf("%s | Failed to build executable: %s.\n", folder, err.Error())

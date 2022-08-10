@@ -10,6 +10,9 @@
 //         -signed-prefix=test/signed \
 //         -signing-profile=main \
 //         -folders=testLambda1,testLambda2 \
+//         -no-upload \
+//         -no-sign \
+//         -no-copy-signed \
 //         -no-update-functions \
 //         -force
 //
@@ -29,6 +32,9 @@
 //         -signing-profile=test_signer \
 //         -include=testLambda1,testLambda2 \
 //         -exclude=internal \
+//         -no-upload \
+//         -no-sign \
+//         -no-copy-signed \
 //         -no-update-functions \
 //         -force
 //
@@ -63,9 +69,11 @@ var profileFlag = flag.String("profile", "", "Which AWS profile to use.")
 var foldersFlag = flag.String("folders", "", "Which folders to deploy.")
 var forceFlag = flag.Bool("force", false, "Deploy even if signed deployment package is up-to-date.")
 var noUploadFlag = flag.Bool("no-upload", false, "Do not upload unsigned deployment packages to S3.")
-var noSigningJobsFlag = flag.Bool("no-signing-jobs", false, "Do not run any signing jobs.")
+var noSignFlag = flag.Bool("no-sign", false, "Do not run any signing jobs.")
 var noCopySignedFlag = flag.Bool("no-copy-signed", false, "Do not copy signed deployment packages to signed prefix.")
 var noUpdateFunctionsFlag = flag.Bool("no-update-functions", false, "Do not update Lambda functions.")
+var instanceFlag = flag.Int("instance", 0, "Which instance this builder is.")
+var numInstancesFlag = flag.Int("num-instances", 0, "Number of instances running.")
 
 // TODO(kesav): look into ClientRequestToken
 // TODO(kesav): check out https://aws.amazon.com/blogs/compute/migrating-aws-lambda-functions-to-arm-based-aws-graviton2-processors/
@@ -132,11 +140,22 @@ func main() {
 			}
 			folders = append(folders, s)
 		}
-		fmt.Printf("Only deploying %s.\n\n", strings.Join(folders, ", "))
 	} else {
 		folders = allFolders
-		fmt.Printf("Deploying all folders.\n\n")
 	}
+
+	if instanceFlag != nil && numInstancesFlag != nil {
+		chunks := spread(folders, 10)
+		fmt.Printf("Chunks:\n")
+		for i, chunk := range chunks {
+			fmt.Printf("%d\t%s\n", i, strings.Join(chunk, ", "))
+		}
+		fmt.Printf("\n")
+		fmt.Printf("Running instance %d of %d.\n\n", *instanceFlag, *numInstancesFlag-1)
+		folders = chunks[*instanceFlag]
+	}
+
+	fmt.Printf("Deploying %s.\n\n", strings.Join(folders, ", "))
 
 	environ := os.Environ()
 	environ = append(environ, "GOOS=linux")
@@ -178,7 +197,7 @@ func main() {
 		ctx: context.TODO(),
 		// flags
 		noUpload:          *noUploadFlag,
-		noSigningJobs:     *noSigningJobsFlag,
+		noSigningJobs:     *noSignFlag,
 		noCopySigned:      *noCopySignedFlag,
 		noUpdateFunctions: noUpdateFunctions,
 		force:             force,
@@ -222,7 +241,7 @@ func main() {
 		}
 	}
 
-	fmt.Printf("\nTook %s.\n\n", timer())
+	fmt.Printf("\nTook %s.\n\n", timer().String())
 
 	if len(failures) != 0 {
 		sort.Strings(failures)
@@ -270,15 +289,29 @@ func contains(strs []string, match string) bool {
 //     }
 //     fmt.Printf("%s | Did something. Took %s.\n", folder, t())
 //
-func newTimer() func() string {
+func newTimer() func() time.Duration {
 	startTime := time.Now()
-	return func() string {
-		duration := time.Since(startTime)
-		minutes := int(duration.Minutes())
-		seconds := int(duration.Seconds()) % 60
-		if minutes == 0 {
-			return fmt.Sprintf("%d seconds", seconds)
-		}
-		return fmt.Sprintf("%d minutes and %d seconds", minutes, seconds)
+	return func() time.Duration {
+		return time.Since(startTime)
 	}
+}
+
+// https://stackoverflow.com/questions/64590042/split-a-slice-into-n-slices
+func spread(folders []string, numInstances int) [][]string {
+	chunks := make([][]string, 0, numInstances)
+	defSize := len(folders) / numInstances
+	numBigger := len(folders) - defSize*numInstances
+	size := defSize + 1
+	for i, idx := 0, 0; i < numInstances; i++ {
+		if i == numBigger {
+			size--
+			if size == 0 {
+				break // no folders left to scan
+			}
+		}
+		// fmt.Println(idx, idx+size)
+		chunks = append(chunks, folders[idx:idx+size])
+		idx += size
+	}
+	return chunks
 }
