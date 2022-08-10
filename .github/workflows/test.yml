@@ -58,11 +58,6 @@ jobs:
 
     - name: Run Builder
       run: |
-        echo ${{ strategy.job-index }}
-        echo ${{ strategy.job-total }}
-        echo matrix instance ${{ matrix.instance }}
-        echo ${{ toJSON(matrix) }} >matrix
-        cat matrix
         chmod +x builder
         mv builder test/lambdas
         cd test/lambdas
@@ -74,8 +69,8 @@ jobs:
             -signing-profile=main \
             -no-update-functions \
             -force \
-            -instance=${{ matrix.instance }} \
-            -num-instances=5 \
+            -instance=${{ strategy.job-index }} \
+            -num-instances=${{ strategy.job-total }} \
         # aws s3 ls --recursive kesav-go-lambda-builder-test
 
   clean-builder:
