@@ -145,17 +145,13 @@ func main() {
 	}
 
 	if instanceFlag != nil && numInstancesFlag != nil {
-		fmt.Printf("Running instance %d of %d.\n\n", *instanceFlag, *numInstancesFlag)
-		var chunks [][]string
-		chunkSize := (len(folders) + *numInstancesFlag - 1) / *numInstancesFlag
-		for i := 0; i < len(folders); i += chunkSize {
-			end := i + chunkSize
-			if end > len(folders) {
-				end = len(folders)
-			}
-			chunks = append(chunks, folders[i:end])
+		chunks := spread(folders, 10)
+		fmt.Printf("Chunks:\n")
+		for i, chunk := range chunks {
+			fmt.Printf("%d\t%s\n", i, strings.Join(chunk, ", "))
 		}
-		fmt.Printf("%#v\n", chunks)
+		fmt.Printf("\n")
+		fmt.Printf("Running instance %d of %d.\n\n", *instanceFlag, *numInstancesFlag-1)
 		folders = chunks[*instanceFlag]
 	}
 
@@ -298,4 +294,23 @@ func newTimer() func() time.Duration {
 	return func() time.Duration {
 		return time.Since(startTime)
 	}
+}
+
+func spread(folders []string, numInstances int) [][]string {
+	chunks := make([][]string, 0, numInstances)
+	defSize := len(folders) / numInstances
+	numBigger := len(folders) - defSize*numInstances
+	size := defSize + 1
+	for i, idx := 0, 0; i < numInstances; i++ {
+		if i == numBigger {
+			size--
+			if size == 0 {
+				break // no folders left to scan
+			}
+		}
+		// fmt.Println(idx, idx+size)
+		chunks = append(chunks, folders[idx:idx+size])
+		idx += size
+	}
+	return chunks
 }
