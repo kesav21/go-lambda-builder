@@ -40,7 +40,7 @@ jobs:
     - build-builder
     strategy:
       matrix:
-        instance: [0,1]
+        instance: [0,1,2,3,4,5]
     steps:
     - name: Checkout
       uses: actions/checkout@v2
@@ -59,7 +59,7 @@ jobs:
     - name: Run Builder
       run: |
         echo matrix instance ${{ matrix.instance }}
-        echo matrix ${{ matrix }}
+        echo matrix ${{ toJSON(matrix) }}
         chmod +x builder
         mv builder test/lambdas
         cd test/lambdas
@@ -72,7 +72,7 @@ jobs:
             -no-update-functions \
             -force \
             -instance=${{ matrix.instance }} \
-            -num-instances=2 \
+            -num-instances=5 \
         # aws s3 ls --recursive kesav-go-lambda-builder-test
 
   clean-builder:
