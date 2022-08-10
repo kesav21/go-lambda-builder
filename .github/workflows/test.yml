@@ -22,6 +22,7 @@ jobs:
 
     - name: Build Builder
       run: |
+        pwd
         go build
         # mv builder test/lambdas
 
@@ -29,7 +30,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: builder
-        path: builder
+        path: /tmp/builder
 
     - name: Remove test/signed/testLambda2
       run: |
@@ -46,6 +47,8 @@ jobs:
         name: builder
     - name: Run Builder
       run: |
+        pwd
+        ls -la
         mv builder test/lambdas
         cd test/lambdas
         ./builder \
