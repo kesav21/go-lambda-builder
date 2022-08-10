@@ -296,6 +296,7 @@ func newTimer() func() time.Duration {
 	}
 }
 
+// https://stackoverflow.com/questions/64590042/split-a-slice-into-n-slices
 func spread(folders []string, numInstances int) [][]string {
 	chunks := make([][]string, 0, numInstances)
 	defSize := len(folders) / numInstances

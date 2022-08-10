@@ -9,7 +9,7 @@ env:
 
 jobs:
   build-builder:
-    runs-on: ubuntu-latest
+    runs-on: mac-latest
     steps:
     - name: Checkout
       uses: actions/checkout@v2
@@ -35,7 +35,7 @@ jobs:
         aws s3 rm s3://kesav-go-lambda-builder-test/test/signed/testLambda2.zip
 
   build-lambdas:
-    runs-on: ubuntu-latest
+    runs-on: mac-latest
     needs:
     - build-builder
     strategy:
@@ -73,7 +73,7 @@ jobs:
             -num-instances=${{ strategy.job-total }} \
 
   clean-builder:
-    runs-on: ubuntu-latest
+    runs-on: mac-latest
     if: ${{ always() }}
     needs:
     - build-builder
