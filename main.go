@@ -155,6 +155,7 @@ func main() {
 			}
 			chunks = append(chunks, folders[i:end])
 		}
+		fmt.Printf("%#v\n", chunks)
 		folders = chunks[*instanceFlag]
 	}
 
