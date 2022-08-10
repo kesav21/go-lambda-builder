@@ -10,6 +10,9 @@
 //         -signed-prefix=test/signed \
 //         -signing-profile=main \
 //         -folders=testLambda1,testLambda2 \
+//         -no-upload \
+//         -no-sign \
+//         -no-copy-signed \
 //         -no-update-functions \
 //         -force
 //
@@ -29,6 +32,9 @@
 //         -signing-profile=test_signer \
 //         -include=testLambda1,testLambda2 \
 //         -exclude=internal \
+//         -no-upload \
+//         -no-sign \
+//         -no-copy-signed \
 //         -no-update-functions \
 //         -force
 //
@@ -63,7 +69,7 @@ var profileFlag = flag.String("profile", "", "Which AWS profile to use.")
 var foldersFlag = flag.String("folders", "", "Which folders to deploy.")
 var forceFlag = flag.Bool("force", false, "Deploy even if signed deployment package is up-to-date.")
 var noUploadFlag = flag.Bool("no-upload", false, "Do not upload unsigned deployment packages to S3.")
-var noSigningJobsFlag = flag.Bool("no-signing-jobs", false, "Do not run any signing jobs.")
+var noSignFlag = flag.Bool("no-sign", false, "Do not run any signing jobs.")
 var noCopySignedFlag = flag.Bool("no-copy-signed", false, "Do not copy signed deployment packages to signed prefix.")
 var noUpdateFunctionsFlag = flag.Bool("no-update-functions", false, "Do not update Lambda functions.")
 
@@ -178,7 +184,7 @@ func main() {
 		ctx: context.TODO(),
 		// flags
 		noUpload:          *noUploadFlag,
-		noSigningJobs:     *noSigningJobsFlag,
+		noSigningJobs:     *noSignFlag,
 		noCopySigned:      *noCopySignedFlag,
 		noUpdateFunctions: noUpdateFunctions,
 		force:             force,
@@ -222,7 +228,7 @@ func main() {
 		}
 	}
 
-	fmt.Printf("\nTook %s.\n\n", timer())
+	fmt.Printf("\nTook %s.\n\n", timer().String())
 
 	if len(failures) != 0 {
 		sort.Strings(failures)
@@ -270,15 +276,9 @@ func contains(strs []string, match string) bool {
 //     }
 //     fmt.Printf("%s | Did something. Took %s.\n", folder, t())
 //
-func newTimer() func() string {
+func newTimer() func() time.Duration {
 	startTime := time.Now()
-	return func() string {
-		duration := time.Since(startTime)
-		minutes := int(duration.Minutes())
-		seconds := int(duration.Seconds()) % 60
-		if minutes == 0 {
-			return fmt.Sprintf("%d seconds", seconds)
-		}
-		return fmt.Sprintf("%d minutes and %d seconds", minutes, seconds)
+	return func() time.Duration {
+		return time.Since(startTime)
 	}
 }
