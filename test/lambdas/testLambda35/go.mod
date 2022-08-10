@@ -1,4 +1,4 @@
-module testLambda2
+module testLambda35
 
 go 1.18
 

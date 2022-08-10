@@ -14,7 +14,7 @@ func main() {
 	) (events.APIGatewayV2HTTPResponse, error) {
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: 200,
-			Body:       "hello from testLambda2",
+			Body:       "hello from testLambda20",
 		}, nil
 	})
 }
