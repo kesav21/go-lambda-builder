@@ -58,7 +58,8 @@ jobs:
 
     - name: Run Builder
       run: |
-        echo matrix instance ${{ matrix.version }}
+        echo matrix instance ${{ matrix.instance }}
+        echo matrix ${{ matrix }}
         chmod +x builder
         mv builder test/lambdas
         cd test/lambdas
@@ -69,7 +70,9 @@ jobs:
             -signed-prefix=test/signed \
             -signing-profile=main \
             -no-update-functions \
-            -force
+            -force \
+            -instance=${{ matrix.instance }} \
+            -num-instances=2 \
         # aws s3 ls --recursive kesav-go-lambda-builder-test
 
   clean-builder:
