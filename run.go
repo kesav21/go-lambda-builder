@@ -206,9 +206,9 @@ func (d *data) buildExecutable(folder, executablePath string) error {
 	cmd := exec.Command("go", "build", "-ldflags=-s -w", "-o", executablePath)
 	cmd.Dir = folder
 	cmd.Env = d.environ
-	// only print errors from go build
+	// don't print the output of go build
 	// cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// cmd.Stderr = os.Stderr
 	err := cmd.Run()
 	if err != nil {
 		fmt.Printf("%s | Failed to build executable: %s.\n", folder, err.Error())
