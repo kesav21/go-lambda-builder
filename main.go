@@ -72,8 +72,8 @@ var noUploadFlag = flag.Bool("no-upload", false, "Do not upload unsigned deploym
 var noSignFlag = flag.Bool("no-sign", false, "Do not run any signing jobs.")
 var noCopySignedFlag = flag.Bool("no-copy-signed", false, "Do not copy signed deployment packages to signed prefix.")
 var noUpdateFunctionsFlag = flag.Bool("no-update-functions", false, "Do not update Lambda functions.")
-var instanceFlag = flag.Int("instance", 0, "Which instance this builder is.")
-var numInstancesFlag = flag.Int("num-instances", 0, "Number of instances running.")
+var instanceFlag = flag.Int("instance", -1, "Which instance this builder is.")
+var numInstancesFlag = flag.Int("num-instances", -1, "Number of instances running.")
 
 // TODO(kesav): look into ClientRequestToken
 // TODO(kesav): check out https://aws.amazon.com/blogs/compute/migrating-aws-lambda-functions-to-arm-based-aws-graviton2-processors/
@@ -85,6 +85,7 @@ var numInstancesFlag = flag.Int("num-instances", 0, "Number of instances running
 // TODO(kesav): record and print durations for every step
 // TODO(kesav): change format of timer to 0m0s000ms
 // TODO(kesav): read options from ~/.config/go-lambda-builder/config.hcl
+// TODO(kesav): delete both the object and the delete marker from unsigned/ and staging/ (wait till monday)
 //
 // if you run two zips on the same input, the hashes of the outputs will be the same
 //
@@ -107,24 +108,21 @@ func main() {
 
 	flag.Parse()
 
-	if bucketFlag == nil {
+	if *bucketFlag == "" {
 		panic(`Flag "bucket" is required.`)
 	}
-	if unsignedPrefixFlag == nil {
+	if *unsignedPrefixFlag == "" {
 		panic(`Flag "unsigned-prefix" is required.`)
 	}
-	if stagingPrefixFlag == nil {
+	if *stagingPrefixFlag == "" {
 		panic(`Flag "staging-prefix" is required.`)
 	}
-	if signedPrefixFlag == nil {
+	if *signedPrefixFlag == "" {
 		panic(`Flag "signed-prefix" is required.`)
 	}
-	if signingProfileFlag == nil {
+	if *signingProfileFlag == "" {
 		panic(`Flag "signing-profile" is required.`)
 	}
-
-	noUpdateFunctions := *noUpdateFunctionsFlag
-	force := *forceFlag
 
 	allFolders, err := lambdaFolders()
 	if err != nil {
@@ -132,7 +130,7 @@ func main() {
 	}
 	folders := []string{}
 	// if the folders flag is passed in, only accept the folders that exist
-	if foldersFlag != nil && *foldersFlag != "" {
+	if *foldersFlag != "" {
 		for _, s := range strings.Split(*foldersFlag, ",") {
 			if !contains(allFolders, s) {
 				fmt.Printf("Lambda folders: %s.\n", strings.Join(allFolders, ", "))
@@ -144,18 +142,21 @@ func main() {
 		folders = allFolders
 	}
 
-	if instanceFlag != nil && numInstancesFlag != nil {
+	if *instanceFlag != -1 && *numInstancesFlag != -1 {
 		chunks := spread(folders, 10)
-		fmt.Printf("Chunks:\n")
 		for i, chunk := range chunks {
-			fmt.Printf("%d\t%s\n", i, strings.Join(chunk, ", "))
+			fmt.Printf("Instance %d: (%d) %s\n", i, len(chunk), strings.Join(chunk, ", "))
 		}
 		fmt.Printf("\n")
 		fmt.Printf("Running instance %d of %d.\n\n", *instanceFlag, *numInstancesFlag-1)
 		folders = chunks[*instanceFlag]
 	}
 
-	fmt.Printf("Deploying %s.\n\n", strings.Join(folders, ", "))
+	if len(folders) == 0 {
+		panic("No folders found.")
+	}
+
+	fmt.Printf("Deploying (%d) folders: %s.\n\n", len(folders), strings.Join(folders, ", "))
 
 	environ := os.Environ()
 	environ = append(environ, "GOOS=linux")
@@ -199,8 +200,8 @@ func main() {
 		noUpload:          *noUploadFlag,
 		noSigningJobs:     *noSignFlag,
 		noCopySigned:      *noCopySignedFlag,
-		noUpdateFunctions: noUpdateFunctions,
-		force:             force,
+		noUpdateFunctions: *noUpdateFunctionsFlag,
+		force:             *forceFlag,
 		// environment variables to pass to go build
 		environ: environ,
 		// s3 config
