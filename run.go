@@ -224,7 +224,9 @@ func (d *data) zipExecutable(folder, executablePath string) (io.Reader, error) {
 	targetW := zip.NewWriter(targetF)
 	defer targetW.Close()
 	// create entry
-	entryW, err := targetW.Create("main")
+	fh := &zip.FileHeader{Name: "main", Method: zip.Deflate}
+	fh.SetMode(0777)
+	entryW, err := targetW.CreateHeader(fh)
 	if err != nil {
 		fmt.Printf("%s | Failed to zip executable: %s.\n", folder, err.Error())
 		return nil, err
