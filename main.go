@@ -2,42 +2,41 @@
 //
 // Usage:
 //
-//     builder \
-//         -profile=kk \
-//         -bucket=kesav-go-lambda-builder-test \
-//         -unsigned-prefix=test/unsigned \
-//         -staging-prefix=test/staging \
-//         -signed-prefix=test/signed \
-//         -signing-profile=main \
-//         -folders=testLambda1,testLambda2 \
-//         -no-upload \
-//         -no-sign \
-//         -no-copy-signed \
-//         -no-update-functions \
-//         -force
+//	builder \
+//	    -profile=kk \
+//	    -bucket=kesav-go-lambda-builder-test \
+//	    -unsigned-prefix=test/unsigned \
+//	    -staging-prefix=test/staging \
+//	    -signed-prefix=test/signed \
+//	    -signing-profile=main \
+//	    -folders=testLambda1,testLambda2 \
+//	    -no-upload \
+//	    -no-sign \
+//	    -no-copy-signed \
+//	    -no-update-functions \
+//	    -force
 //
 // TODO(kesav): make the flags look like this:
 //
-//     builder \
-//         -chdir=test/lambdas \
-//         -region=us-west-2 \
-//         -profile=kk \
-//         -unsigned-bucket-versioning-enabled \
-//         -unsigned-bucket=kesav-go-lambda-builder-test \
-//         -unsigned-prefix=test/unsigned \
-//         -staging-bucket=kesav-go-lambda-builder-test \
-//         -staging-prefix=test/staging \
-//         -signed-bucket=kesav-go-lambda-builder-test \
-//         -signed-prefix=test/signed \
-//         -signing-profile=test_signer \
-//         -include=testLambda1,testLambda2 \
-//         -exclude=internal \
-//         -no-upload \
-//         -no-sign \
-//         -no-copy-signed \
-//         -no-update-functions \
-//         -force
-//
+//	builder \
+//	    -chdir=test/lambdas \
+//	    -region=us-west-2 \
+//	    -profile=kk \
+//	    -unsigned-bucket-versioning-enabled \
+//	    -unsigned-bucket=kesav-go-lambda-builder-test \
+//	    -unsigned-prefix=test/unsigned \
+//	    -staging-bucket=kesav-go-lambda-builder-test \
+//	    -staging-prefix=test/staging \
+//	    -signed-bucket=kesav-go-lambda-builder-test \
+//	    -signed-prefix=test/signed \
+//	    -signing-profile=test_signer \
+//	    -include=testLambda1,testLambda2 \
+//	    -exclude=internal \
+//	    -no-upload \
+//	    -no-sign \
+//	    -no-copy-signed \
+//	    -no-update-functions \
+//	    -force
 package main
 
 import (
@@ -102,7 +101,6 @@ var numInstancesFlag = flag.Int("num-instances", -1, "Number of instances runnin
 //
 // size of unsigned deployment package without upx | 6.04 M
 // size of unsigned deployment package with upx -7 | 5.82 M
-//
 func main() {
 	timer := newTimer()
 
@@ -281,15 +279,14 @@ func contains(strs []string, match string) bool {
 // Returns a function that returns a string.
 // Expects duration to be less than one hour.
 //
-//     fmt.Printf("%s | Doing something.\n", folder)
-//     t := newTimer()
-//     err = doSomething(folder)
-//     if err != nil {
-//         fmt.Printf("%s | Failed to do something: %s\n", folder, err.Error())
-//         return
-//     }
-//     fmt.Printf("%s | Did something. Took %s.\n", folder, t())
-//
+//	fmt.Printf("%s | Doing something.\n", folder)
+//	t := newTimer()
+//	err = doSomething(folder)
+//	if err != nil {
+//	    fmt.Printf("%s | Failed to do something: %s\n", folder, err.Error())
+//	    return
+//	}
+//	fmt.Printf("%s | Did something. Took %s.\n", folder, t())
 func newTimer() func() time.Duration {
 	startTime := time.Now()
 	return func() time.Duration {
