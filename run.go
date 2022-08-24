@@ -32,8 +32,10 @@ type data struct {
 	noCopySigned      bool
 	noUpdateFunctions bool
 	force             bool
-	// environment variables to pass to go build
-	environ []string
+	// go build config
+	goarch string
+	// zip config
+	handler string
 	// s3 config
 	s3             *s3.Client
 	bucket         string
@@ -205,7 +207,10 @@ func (d *data) buildExecutable(folder, executablePath string) error {
 	fmt.Printf("%s | Building executable.\n", folder)
 	cmd := exec.Command("go", "build", "-ldflags=-s -w", "-o", executablePath)
 	cmd.Dir = folder
-	cmd.Env = d.environ
+	cmd.Env = os.Environ()
+	cmd.Env = append(cmd.Env, "GOOS=linux")
+	cmd.Env = append(cmd.Env, "GOARCH="+d.goarch)
+	cmd.Env = append(cmd.Env, "CGO_ENABLED=0")
 	// don't print the output of go build
 	// cmd.Stdout = os.Stdout
 	// cmd.Stderr = os.Stderr
@@ -224,7 +229,7 @@ func (d *data) zipExecutable(folder, executablePath string) (io.Reader, error) {
 	targetW := zip.NewWriter(targetF)
 	defer targetW.Close()
 	// create entry
-	fh := &zip.FileHeader{Name: "main", Method: zip.Deflate}
+	fh := &zip.FileHeader{Name: d.handler, Method: zip.Deflate}
 	fh.SetMode(0777)
 	entryW, err := targetW.CreateHeader(fh)
 	if err != nil {

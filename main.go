@@ -43,7 +43,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -63,6 +62,8 @@ var signedPrefixFlag = flag.String("signed-prefix", "", "Where to upload unsigne
 var signingProfileFlag = flag.String("signing-profile", "", "Which profile to use to sign deployment packages.")
 
 // optional
+var goarchFlag = flag.String("goarch", "amd64", "The architecture for which to compile.")
+var handlerFlag = flag.String("handler", "main", "The entrypoint for the Lambda function.")
 var regionFlag = flag.String("region", "", "Which AWS region to use.")
 var profileFlag = flag.String("profile", "", "Which AWS profile to use.")
 var foldersFlag = flag.String("folders", "", "Which folders to deploy.")
@@ -156,11 +157,6 @@ func main() {
 
 	fmt.Printf("Deploying (%d) folders: %s.\n\n", len(folders), strings.Join(folders, ", "))
 
-	environ := os.Environ()
-	environ = append(environ, "GOOS=linux")
-	environ = append(environ, "GOARCH=amd64")
-	environ = append(environ, "CGO_ENABLED=0")
-
 	var opts []func(*config.LoadOptions) error
 	if regionFlag != nil {
 		opts = append(opts, config.WithRegion(*regionFlag))
@@ -201,7 +197,8 @@ func main() {
 		noUpdateFunctions: *noUpdateFunctionsFlag,
 		force:             *forceFlag,
 		// environment variables to pass to go build
-		environ: environ,
+		goarch:  *goarchFlag,
+		handler: *handlerFlag,
 		// s3 config
 		s3:             s3Client,
 		bucket:         *bucketFlag,
