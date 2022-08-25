@@ -8,3 +8,6 @@ plugins:
 - - "@semantic-release/git"
   - assets:
     - CHANGELOG.md
+- - "@semantic-release/exec"
+  - verifyReleaseCmd: |
+      echo ${nextRelease.version} >version
