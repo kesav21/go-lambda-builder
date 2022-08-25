@@ -16,9 +16,9 @@ jobs:
   #   runs-on: ubuntu-latest
   #   steps:
   #   - name: Checkout
-  #     uses: actions/checkout@v2
+  #     uses: actions/checkout@v3
   #   - name: Setup Go
-  #     uses: actions/setup-go@v3.1.0
+  #     uses: actions/setup-go@v3
   #     with:
   #       go-version: 1.18
   #       check-latest: true
@@ -43,9 +43,9 @@ jobs:
   #       instance: [0,1,2,3,4,5,6,7,8,9]
   #   steps:
   #   - name: Checkout
-  #     uses: actions/checkout@v2
+  #     uses: actions/checkout@v3
   #   - name: Setup Go
-  #     uses: actions/setup-go@v3.1.0
+  #     uses: actions/setup-go@v3
   #     with:
   #       go-version: 1.18
   #       check-latest: true
@@ -90,7 +90,7 @@ jobs:
       version: ${{steps.version.outputs.version}}
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
     - name: Determine release version
       id: version
       run: |
@@ -115,9 +115,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
     - name: Setup Go
-      uses: actions/setup-go@v1
+      uses: actions/setup-go@v3
       with:
         go-version: 1.18
     - name: Set artifact name
@@ -133,20 +133,19 @@ jobs:
         go build
         zip ${{steps.artifact_name.outputs.name}} "$(find . -name '*builder*')"
     - name: Upload Artifact
-      uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@v3
       with:
         name: ${{steps.artifact_name.outputs.name}}
         path: ${{steps.artifact_name.outputs.name}}
 
   verify_artifacts:
+    name: Verify Artifacts
     needs:
     - build
     runs-on: ubuntu-latest
     steps:
     - name: Download Artifacts
-      uses: actions/download-artifact@v1
-      with:
-        path: .
+      uses: actions/download-artifact@v3
     - name: Verify Artifacts
       run: |
         pwd
