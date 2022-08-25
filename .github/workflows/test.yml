@@ -118,7 +118,6 @@ jobs:
         name: version
     - name: Set Artifact Name
       id: artifact_name
-      uses: actions/setup-go@v1
       run: |
         name=builder-v${{needs.version.outputs.version}}-${{env.GOOS}}-${{env.GOARCH}}.zip
         echo "::set-output name=name::$name"
