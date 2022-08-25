@@ -1,6 +1,9 @@
 name: Test
 
-on: push
+on:
+  push:
+    branches-ignore:
+    - main
 
 env:
   AWS_REGION: us-east-1
@@ -8,81 +11,130 @@ env:
   AWS_SECRET_ACCESS_KEY: ${{secrets.AWS_SECRET_ACCESS_KEY}}
 
 jobs:
-  build-builder:
+
+  # build-builder:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - name: Checkout
+  #     uses: actions/checkout@v2
+  #   - name: Setup Go
+  #     uses: actions/setup-go@v3.1.0
+  #     with:
+  #       go-version: 1.18
+  #       check-latest: true
+  #   - name: Build Builder
+  #     run: |
+  #       go build
+  #   - name: Create Builder Artifact
+  #     uses: actions/upload-artifact@v3
+  #     with:
+  #       name: builder
+  #       path: builder
+  #   - name: Remove test/signed/testLambda2
+  #     run: |
+  #       aws s3 rm s3://kesav-go-lambda-builder-test/test/signed/testLambda2.zip
+
+  # build-lambdas:
+  #   runs-on: ubuntu-latest
+  #   needs:
+  #   - build-builder
+  #   strategy:
+  #     matrix:
+  #       instance: [0,1,2,3,4,5,6,7,8,9]
+  #   steps:
+  #   - name: Checkout
+  #     uses: actions/checkout@v2
+  #   - name: Setup Go
+  #     uses: actions/setup-go@v3.1.0
+  #     with:
+  #       go-version: 1.18
+  #       check-latest: true
+  #   - name: Download Builder Artifact
+  #     uses: actions/download-artifact@v3
+  #     with:
+  #       name: builder
+  #   - name: Run Builder
+  #     run: |
+  #       chmod +x builder
+  #       mv builder test/lambdas
+  #       cd test/lambdas
+  #       ./builder \
+  #           -bucket=kesav-go-lambda-builder-test \
+  #           -unsigned-prefix=test/unsigned \
+  #           -staging-prefix=test/staging \
+  #           -signed-prefix=test/signed \
+  #           -signing-profile=main \
+  #           -goarch=arm64 \
+  #           -handler=bootstrap \
+  #           -no-update-functions \
+  #           -force \
+  #           -instance=${{strategy.job-index}} \
+  #           -num-instances=${{strategy.job-total}} \
+
+  # clean-builder:
+  #   runs-on: ubuntu-latest
+  #   if: ${{always()}}
+  #   needs:
+  #   - build-builder
+  #   - build-lambdas
+  #   steps:
+  #   - name: Delete Builder Artifact
+  #     uses: geekyeggo/delete-artifact@v1
+  #     with:
+  #       name: builder
+
+  version:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{steps.version.outputs.version}}
     steps:
-    - name: Checkout
-      uses: actions/checkout@v2
-
-    - name: Setup Go
-      uses: actions/setup-go@v3.1.0
-      with:
-        go-version: 1.18
-        check-latest: true
-
-    - name: Build Builder
+    - name: Determine release version
+      id: version
       run: |
-        go build
+        npm install
+        npx semantic-release --dry-run
+        cat version
+        echo "::set-output name=version::$(cat version)"
 
-    - name: Create Builder Artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: builder
-        path: builder
-
-    - name: Remove test/signed/testLambda2
-      run: |
-        aws s3 rm s3://kesav-go-lambda-builder-test/test/signed/testLambda2.zip
-
-  build-lambdas:
-    runs-on: ubuntu-latest
-    needs:
-    - build-builder
+  build:
     strategy:
       matrix:
-        instance: [0,1,2,3,4,5,6,7,8,9]
+        GOOS:
+        - darwin
+        - linux
+        - windows
+        GOARCH:
+        - arm64
+        - amd64
+    needs:
+    - version
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout
       uses: actions/checkout@v2
-
-    - name: Setup Go
-      uses: actions/setup-go@v3.1.0
-      with:
-        go-version: 1.18
-        check-latest: true
-
-    - name: Download Builder Artifact
+    - name: Download Version Artifact
       uses: actions/download-artifact@v3
       with:
-        name: builder
-
-    - name: Run Builder
+        name: version
+    - name: Set Artifact Name
+      id: artifact_name
+      uses: actions/setup-go@v1
       run: |
-        chmod +x builder
-        mv builder test/lambdas
-        cd test/lambdas
-        ./builder \
-            -bucket=kesav-go-lambda-builder-test \
-            -unsigned-prefix=test/unsigned \
-            -staging-prefix=test/staging \
-            -signed-prefix=test/signed \
-            -signing-profile=main \
-            -goarch=arm64 \
-            -handler=bootstrap \
-            -no-update-functions \
-            -force \
-            -instance=${{ strategy.job-index }} \
-            -num-instances=${{ strategy.job-total }} \
-
-  clean-builder:
-    runs-on: ubuntu-latest
-    if: ${{ always() }}
-    needs:
-    - build-builder
-    - build-lambdas
-    steps:
-    - name: Delete Builder Artifact
-      uses: geekyeggo/delete-artifact@v1
+        name=builder-v${{needs.version.outputs.version}}-${{env.GOOS}}-${{env.GOARCH}}.zip
+        echo "::set-output name=name::$name"
+    - name: Setup Go
+      uses: actions/setup-go@v1
       with:
-        name: builder
-
+        go-version: 1.18
+    - name: Build
+      env:
+        GOOS: ${{matrix.GOOS}}
+        GOARCH: ${{matrix.GOARCH}}
+      run: |
+        go build
+        zip ${{steps.artifact_name.outputs.name}} builder
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v1
+      with:
+        name: ${{steps.artifact_name.outputs.name}}
+        path: ${{steps.artifact_name.outputs.name}}
