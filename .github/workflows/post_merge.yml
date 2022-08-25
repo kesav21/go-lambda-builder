@@ -47,23 +47,20 @@ jobs:
       uses: actions/setup-go@v3
       with:
         go-version: 1.18
-    - name: Set artifact name
-      id: artifact_name
-      run: |
-        name=builder-v${{needs.version.outputs.version}}-${{matrix.GOOS}}-${{matrix.GOARCH}}.zip
-        echo "::set-output name=name::$name"
     - name: Build
       env:
         GOOS: ${{matrix.GOOS}}
         GOARCH: ${{matrix.GOARCH}}
       run: |
         go build
-        zip ${{steps.artifact_name.outputs.name}} $(find . -name '*builder*')
+        zip \
+          builder-v${{needs.version.outputs.version}}-${{matrix.GOOS}}-${{matrix.GOARCH}}.zip \
+          $(find . -name '*builder*')
     - name: Upload Artifact
       uses: actions/upload-artifact@v3
       with:
-        name: ${{matrix.GOOS}}-${{matrix.GOARCH}}
-        path: ${{steps.artifact_name.outputs.name}}
+        name: builder-v${{needs.version.outputs.version}}-${{matrix.GOOS}}-${{matrix.GOARCH}}
+        path: builder-v${{needs.version.outputs.version}}-${{matrix.GOOS}}-${{matrix.GOARCH}}.zip
 
   release:
     name: Release
