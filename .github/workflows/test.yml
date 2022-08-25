@@ -88,6 +88,8 @@ jobs:
     outputs:
       version: ${{steps.version.outputs.version}}
     steps:
+    - name: Checkout
+      uses: actions/checkout@v2
     - name: Determine release version
       id: version
       run: |
@@ -112,19 +114,15 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v2
-    - name: Download Version Artifact
-      uses: actions/download-artifact@v3
-      with:
-        name: version
-    - name: Set Artifact Name
-      id: artifact_name
-      run: |
-        name=builder-v${{needs.version.outputs.version}}-${{env.GOOS}}-${{env.GOARCH}}.zip
-        echo "::set-output name=name::$name"
     - name: Setup Go
       uses: actions/setup-go@v1
       with:
         go-version: 1.18
+    - name: Set Artifact Name
+      id: artifact_name
+      run: |
+        name=builder-v${{needs.version.outputs.version}}-${{matrix.GOOS}}-${{matrix.GOARCH}}.zip
+        echo "::set-output name=name::$name"
     - name: Build
       env:
         GOOS: ${{matrix.GOOS}}
