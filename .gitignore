@@ -1,2 +1,4 @@
 /builder
 /Makefile
+/node_modules
+/.ignore

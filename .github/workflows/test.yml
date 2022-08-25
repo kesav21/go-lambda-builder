@@ -86,3 +86,14 @@ jobs:
       with:
         name: builder
 
+  test_release:
+    name: Test Release
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Test Release
+      run: |
+        npm install
+        npx semantic-release --dry-run
+
