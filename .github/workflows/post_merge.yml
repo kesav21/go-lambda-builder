@@ -5,15 +5,76 @@ on:
     branches:
     - main
 
+env:
+  GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
 jobs:
-  release:
-    name: Release
+
+  version:
+    name: Determine release version
     runs-on: ubuntu-latest
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    outputs:
+      version: ${{steps.version.outputs.version}}
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
+    - name: Determine release version
+      id: version
+      run: |
+        npm install
+        npx semantic-release --dry-run
+        cat version
+        echo "::set-output name=version::$(cat version)"
+
+  build:
+    strategy:
+      matrix:
+        GOOS:
+        - darwin
+        - linux
+        - windows
+        GOARCH:
+        - arm64
+        - amd64
+    name: Build ${{matrix.GOOS}}/${{matrix.GOARCH}}
+    needs:
+    - version
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Setup Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.18
+    - name: Set artifact name
+      id: artifact_name
+      run: |
+        name=builder-v${{needs.version.outputs.version}}-${{matrix.GOOS}}-${{matrix.GOARCH}}.zip
+        echo "::set-output name=name::$name"
+    - name: Build
+      env:
+        GOOS: ${{matrix.GOOS}}
+        GOARCH: ${{matrix.GOARCH}}
+      run: |
+        go build
+        zip ${{steps.artifact_name.outputs.name}} $(find . -name '*builder*')
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{steps.artifact_name.outputs.name}}
+        path: ${{steps.artifact_name.outputs.name}}
+
+  release:
+    name: Release
+    needs:
+    - build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Download All Artifacts
+      uses: actions/download-artifact@v3
     - name: Release
       run: |
         npm install

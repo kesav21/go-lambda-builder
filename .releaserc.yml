@@ -1,7 +1,6 @@
 repositoryUrl: https://github.com/kesav21/go-lambda-builder.git
 branches:
 - main
-- fix/release-binaries
 plugins:
 - "@semantic-release/commit-analyzer"
 - "@semantic-release/release-notes-generator"
