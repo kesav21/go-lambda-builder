@@ -1,3 +1,10 @@
+## [1.0.10](https://github.com/kesav21/go-lambda-builder/compare/v1.0.9...v1.0.10) (2022-08-25)
+
+
+### Bug Fixes
+
+* change artifact name ([#11](https://github.com/kesav21/go-lambda-builder/issues/11)) ([6428e50](https://github.com/kesav21/go-lambda-builder/commit/6428e50b88abe39a9d853014fe65f87c9dbaede7))
+
 ## [1.0.9](https://github.com/kesav21/go-lambda-builder/compare/v1.0.8...v1.0.9) (2022-08-25)
 
 
