@@ -84,6 +84,7 @@ jobs:
   #       name: builder
 
   version:
+    name: Deletermine release version
     runs-on: ubuntu-latest
     outputs:
       version: ${{steps.version.outputs.version}}
@@ -108,6 +109,7 @@ jobs:
         GOARCH:
         - arm64
         - amd64
+    name: Build ${{matrix.GOOS}}/${{matrix.GOARCH}}
     needs:
     - version
     runs-on: ubuntu-latest
@@ -118,7 +120,7 @@ jobs:
       uses: actions/setup-go@v1
       with:
         go-version: 1.18
-    - name: Set Artifact Name
+    - name: Set artifact name
       id: artifact_name
       run: |
         name=builder-v${{needs.version.outputs.version}}-${{matrix.GOOS}}-${{matrix.GOARCH}}.zip
@@ -129,7 +131,7 @@ jobs:
         GOARCH: ${{matrix.GOARCH}}
       run: |
         go build
-        zip ${{steps.artifact_name.outputs.name}} builder
+        zip ${{steps.artifact_name.outputs.name}} "$(find . -name '*builder*')"
     - name: Upload Artifact
       uses: actions/upload-artifact@v1
       with:
