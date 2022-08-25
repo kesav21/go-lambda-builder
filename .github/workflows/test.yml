@@ -131,22 +131,26 @@ jobs:
         GOARCH: ${{matrix.GOARCH}}
       run: |
         go build
-        zip ${{steps.artifact_name.outputs.name}} "$(find . -name '*builder*')"
+        zip ${{steps.artifact_name.outputs.name}} $(find . -name '*builder*')
     - name: Upload Artifact
       uses: actions/upload-artifact@v3
       with:
         name: ${{steps.artifact_name.outputs.name}}
         path: ${{steps.artifact_name.outputs.name}}
 
-  verify_artifacts:
-    name: Verify Artifacts
+  release:
+    name: Release
     needs:
     - build
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
     steps:
-    - name: Download Artifacts
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Download All Artifacts
       uses: actions/download-artifact@v3
-    - name: Verify Artifacts
+    - name: Release
       run: |
-        pwd
-        ls -la
+        npm install
+        npx semantic-release --dry-run

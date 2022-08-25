@@ -9,6 +9,9 @@ plugins:
 - - "@semantic-release/git"
   - assets:
     - CHANGELOG.md
+- - "@semantic-release/github"
+  - assets:
+    - "*.zip"
 - - "@semantic-release/exec"
   - verifyReleaseCmd: |
       echo ${nextRelease.version} >version
