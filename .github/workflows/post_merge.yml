@@ -63,7 +63,7 @@ jobs:
     - name: Upload Artifact
       uses: actions/upload-artifact@v3
       with:
-        name: ${{steps.artifact_name.outputs.name}}
+        name: ${{matrix.GOOS}}-${{matrix.GOARCH}}
         path: ${{steps.artifact_name.outputs.name}}
 
   release:
@@ -78,6 +78,10 @@ jobs:
       uses: actions/download-artifact@v3
     - name: Release
       run: |
+        pwd
+        ls -la
+        find . -name '*builder*'
+        mv **/*.zip .
         pwd
         ls -la
         find . -name '*builder*'
