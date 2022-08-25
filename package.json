@@ -1,3 +1,8 @@
 {
-  "name": "go-lambda-builder"
+  "name": "go-lambda-builder",
+  "devDependencies": {
+    "semantic-release": "^19.0.5",
+    "@semantic-release/changelog": "^6.0.1",
+    "@semantic-release/git": "^10.0.1"
+  }
 }
