@@ -1,6 +1,9 @@
 name: Test
 
-on: push
+on:
+  push:
+    branches-ignore:
+    - main
 
 env:
   AWS_REGION: us-east-1
@@ -8,31 +11,28 @@ env:
   AWS_SECRET_ACCESS_KEY: ${{secrets.AWS_SECRET_ACCESS_KEY}}
 
 jobs:
+
   build-builder:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
-
+      uses: actions/checkout@v3
     - name: Setup Go
-      uses: actions/setup-go@v3.1.0
+      uses: actions/setup-go@v3
       with:
         go-version: 1.18
         check-latest: true
-
     - name: Build Builder
       run: |
         go build
-
     - name: Create Builder Artifact
       uses: actions/upload-artifact@v3
       with:
         name: builder
         path: builder
-
-    - name: Remove test/signed/testLambda2
+    - name: Remove test/signed/testLambda02
       run: |
-        aws s3 rm s3://kesav-go-lambda-builder-test/test/signed/testLambda2.zip
+        aws s3 rm s3://kesav-go-lambda-builder-test/test/signed/testLambda02.zip
 
   build-lambdas:
     runs-on: ubuntu-latest
@@ -43,19 +43,16 @@ jobs:
         instance: [0,1,2,3,4,5,6,7,8,9]
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
-
+      uses: actions/checkout@v3
     - name: Setup Go
-      uses: actions/setup-go@v3.1.0
+      uses: actions/setup-go@v3
       with:
         go-version: 1.18
         check-latest: true
-
     - name: Download Builder Artifact
       uses: actions/download-artifact@v3
       with:
         name: builder
-
     - name: Run Builder
       run: |
         chmod +x builder
@@ -71,12 +68,12 @@ jobs:
             -handler=bootstrap \
             -no-update-functions \
             -force \
-            -instance=${{ strategy.job-index }} \
-            -num-instances=${{ strategy.job-total }} \
+            -instance=${{strategy.job-index}} \
+            -num-instances=${{strategy.job-total}} \
 
   clean-builder:
     runs-on: ubuntu-latest
-    if: ${{ always() }}
+    if: ${{always()}}
     needs:
     - build-builder
     - build-lambdas
@@ -85,4 +82,3 @@ jobs:
       uses: geekyeggo/delete-artifact@v1
       with:
         name: builder
-
