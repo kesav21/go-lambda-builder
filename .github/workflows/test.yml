@@ -84,7 +84,7 @@ jobs:
   #       name: builder
 
   version:
-    name: Deletermine release version
+    name: Determine release version
     runs-on: ubuntu-latest
     outputs:
       version: ${{steps.version.outputs.version}}
@@ -137,3 +137,17 @@ jobs:
       with:
         name: ${{steps.artifact_name.outputs.name}}
         path: ${{steps.artifact_name.outputs.name}}
+
+  verify_artifacts:
+    needs:
+    - build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download Artifacts
+      uses: actions/download-artifact@v1
+      with:
+        name: builder-*
+    - name: Verify Artifacts
+      run: |
+        pwd
+        ls -la
