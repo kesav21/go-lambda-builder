@@ -2,49 +2,47 @@
 //
 // Usage:
 //
-//     builder \
-//         -profile=kk \
-//         -bucket=kesav-go-lambda-builder-test \
-//         -unsigned-prefix=test/unsigned \
-//         -staging-prefix=test/staging \
-//         -signed-prefix=test/signed \
-//         -signing-profile=main \
-//         -folders=testLambda1,testLambda2 \
-//         -no-upload \
-//         -no-sign \
-//         -no-copy-signed \
-//         -no-update-functions \
-//         -force
+//	builder \
+//	    -profile=kk \
+//	    -bucket=kesav-go-lambda-builder-test \
+//	    -unsigned-prefix=test/unsigned \
+//	    -staging-prefix=test/staging \
+//	    -signed-prefix=test/signed \
+//	    -signing-profile=main \
+//	    -folders=testLambda1,testLambda2 \
+//	    -no-upload \
+//	    -no-sign \
+//	    -no-copy-signed \
+//	    -no-update-functions \
+//	    -force
 //
 // TODO(kesav): make the flags look like this:
 //
-//     builder \
-//         -chdir=test/lambdas \
-//         -region=us-west-2 \
-//         -profile=kk \
-//         -unsigned-bucket-versioning-enabled \
-//         -unsigned-bucket=kesav-go-lambda-builder-test \
-//         -unsigned-prefix=test/unsigned \
-//         -staging-bucket=kesav-go-lambda-builder-test \
-//         -staging-prefix=test/staging \
-//         -signed-bucket=kesav-go-lambda-builder-test \
-//         -signed-prefix=test/signed \
-//         -signing-profile=test_signer \
-//         -include=testLambda1,testLambda2 \
-//         -exclude=internal \
-//         -no-upload \
-//         -no-sign \
-//         -no-copy-signed \
-//         -no-update-functions \
-//         -force
-//
+//	builder \
+//	    -chdir=test/lambdas \
+//	    -region=us-west-2 \
+//	    -profile=kk \
+//	    -unsigned-bucket-versioning-enabled \
+//	    -unsigned-bucket=kesav-go-lambda-builder-test \
+//	    -unsigned-prefix=test/unsigned \
+//	    -staging-bucket=kesav-go-lambda-builder-test \
+//	    -staging-prefix=test/staging \
+//	    -signed-bucket=kesav-go-lambda-builder-test \
+//	    -signed-prefix=test/signed \
+//	    -signing-profile=test_signer \
+//	    -include=testLambda1,testLambda2 \
+//	    -exclude=internal \
+//	    -no-upload \
+//	    -no-sign \
+//	    -no-copy-signed \
+//	    -no-update-functions \
+//	    -force
 package main
 
 import (
 	"context"
 	"flag"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -64,6 +62,8 @@ var signedPrefixFlag = flag.String("signed-prefix", "", "Where to upload unsigne
 var signingProfileFlag = flag.String("signing-profile", "", "Which profile to use to sign deployment packages.")
 
 // optional
+var goarchFlag = flag.String("goarch", "amd64", "The architecture for which to compile.")
+var handlerFlag = flag.String("handler", "main", "The entrypoint for the Lambda function.")
 var regionFlag = flag.String("region", "", "Which AWS region to use.")
 var profileFlag = flag.String("profile", "", "Which AWS profile to use.")
 var foldersFlag = flag.String("folders", "", "Which folders to deploy.")
@@ -102,7 +102,6 @@ var numInstancesFlag = flag.Int("num-instances", -1, "Number of instances runnin
 //
 // size of unsigned deployment package without upx | 6.04 M
 // size of unsigned deployment package with upx -7 | 5.82 M
-//
 func main() {
 	timer := newTimer()
 
@@ -158,11 +157,6 @@ func main() {
 
 	fmt.Printf("Deploying (%d) folders: %s.\n\n", len(folders), strings.Join(folders, ", "))
 
-	environ := os.Environ()
-	environ = append(environ, "GOOS=linux")
-	environ = append(environ, "GOARCH=amd64")
-	environ = append(environ, "CGO_ENABLED=0")
-
 	var opts []func(*config.LoadOptions) error
 	if regionFlag != nil {
 		opts = append(opts, config.WithRegion(*regionFlag))
@@ -203,7 +197,8 @@ func main() {
 		noUpdateFunctions: *noUpdateFunctionsFlag,
 		force:             *forceFlag,
 		// environment variables to pass to go build
-		environ: environ,
+		goarch:  *goarchFlag,
+		handler: *handlerFlag,
 		// s3 config
 		s3:             s3Client,
 		bucket:         *bucketFlag,
@@ -281,15 +276,14 @@ func contains(strs []string, match string) bool {
 // Returns a function that returns a string.
 // Expects duration to be less than one hour.
 //
-//     fmt.Printf("%s | Doing something.\n", folder)
-//     t := newTimer()
-//     err = doSomething(folder)
-//     if err != nil {
-//         fmt.Printf("%s | Failed to do something: %s\n", folder, err.Error())
-//         return
-//     }
-//     fmt.Printf("%s | Did something. Took %s.\n", folder, t())
-//
+//	fmt.Printf("%s | Doing something.\n", folder)
+//	t := newTimer()
+//	err = doSomething(folder)
+//	if err != nil {
+//	    fmt.Printf("%s | Failed to do something: %s\n", folder, err.Error())
+//	    return
+//	}
+//	fmt.Printf("%s | Did something. Took %s.\n", folder, t())
 func newTimer() func() time.Duration {
 	startTime := time.Now()
 	return func() time.Duration {
