@@ -1,3 +1,10 @@
+## [1.0.6](https://github.com/kesav21/go-lambda-builder/compare/v1.0.5...v1.0.6) (2022-08-25)
+
+
+### Bug Fixes
+
+* debug release ([df37087](https://github.com/kesav21/go-lambda-builder/commit/df370878f205b331a5770d04a7aa2f6edc0a29fa))
+
 ## [1.0.5](https://github.com/kesav21/go-lambda-builder/compare/v1.0.4...v1.0.5) (2022-08-25)
 
 
