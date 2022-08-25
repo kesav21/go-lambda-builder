@@ -59,6 +59,7 @@ jobs:
       run: |
         go build
         zip ${{steps.artifact_name.outputs.name}} $(find . -name '*builder*')
+        ls -la
     - name: Upload Artifact
       uses: actions/upload-artifact@v3
       with:
@@ -79,5 +80,6 @@ jobs:
       run: |
         pwd
         ls -la
+        find . -name '*builder*'
         npm install
         npx semantic-release --debug
