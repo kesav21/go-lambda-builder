@@ -1,3 +1,6 @@
 repositoryUrl: https://github.com/kesav21/go-lambda-builder.git
 branches:
 - main
+plugins:
+- - '@semantic-release/npm'
+  - npmPublish: false
