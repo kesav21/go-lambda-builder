@@ -4,3 +4,7 @@ branches:
 plugins:
 - - '@semantic-release/npm'
   - npmPublish: false
+- "@semantic-release/changelog"
+- - "@semantic-release/git"
+  - assets:
+    - CHANGELOG.md
